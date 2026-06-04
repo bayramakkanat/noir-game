@@ -77,12 +77,7 @@ export function applyKillerPickIdentity(game, cardSuspectId) {
     activeSide: game.humanRole === 'killer' ? 'human' : 'ai',
   };
 
-  // Sadece kendi rolüne ait kimlik log'a yazılır
-  if (game.humanRole === 'killer') {
-    next = addLog(next, `🗡️ Gizli kimliğin: <b>${suspectName(cardSuspectId)}</b>. İlk hamle: komşunu öldür.`);
-  } else {
-    next = addLog(next, `Katil kimliğini seçti. İlk hamle başlıyor...`);
-  }
+  next = addLog(next, `🗡️ Katil kimliğini seçti. İlk hamle başlıyor...`);
   return { ok: true, game: next };
 }
 
@@ -184,12 +179,7 @@ export function applyDisguise(game, killerState, inspectorSecretId) {
     phase: PHASE.KILLER_PICK_DISGUISE 
   };
 
-  // Kılık değiştirince eski kimlik herkese açıklanır (açık olarak atılır)
-  if (game.humanRole === 'killer') {
-    next = addLog(next, `⇄ Kılık değiştiriyorsun. Eski kimliğin <b>${suspectName(oldIdentityId)}</b> açığa çıktı. Tahtadan yeni kimliğini seç.`);
-  } else {
-    next = addLog(next, `⇄ Katil kılık değiştirdi! Önceki kimliği <b>${suspectName(oldIdentityId)}</b> imiş.`);
-  }
+  next = addLog(next, `⇄ Katil kılık değiştirdi! Eski kimliği <b>${suspectName(oldIdentityId)}</b> açığa çıktı.`);
 
   // Turn advance is deferred to pick disguise phase
   return { ok: true, game: next };
@@ -216,9 +206,7 @@ export function applyKillerPickDisguise(game, cardSuspectId) {
     },
   };
 
-  if (game.humanRole === 'killer') {
-    next = addLog(next, `Yeni kimliğin: <b>${suspectName(cardSuspectId)}</b>.`);
-  }
+  next = addLog(next, `🗡️ Katil yeni kimliğini seçti.`);
   
   next = applyWinChecks(next, next.killer.identitySuspectId, game.inspector.secretIdentitySuspectId);
   if (next.gameOver) return { ok: true, game: next };
@@ -266,11 +254,6 @@ export function applyInspectorPickIdentity(game, cardSuspectId) {
     activeSide: game.humanRole === 'killer' ? 'human' : 'ai',
   };
 
-  // Sadece kendi rolüne ait kimlik log'a yazılır
-  if (game.humanRole === 'inspector') {
-    next = addLog(next, `🔍 Gizli kimliğin: <b>${suspectName(cardSuspectId)}</b>. Oyun başlıyor.`);
-  } else {
-    next = addLog(next, `Dedektif kimliğini seçti. Oyun başlıyor.`);
-  }
+  next = addLog(next, `🔍 Dedektif kimliğini seçti. Oyun başlıyor.`);
   return { ok: true, game: next };
 }

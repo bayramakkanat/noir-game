@@ -447,6 +447,20 @@ function ActionPanel({ game, actions }) {
         </div>
       )}
 
+      {/* Katilin kılık değiştirme kartı */}
+      {isHumanKiller && killer.disguiseCardSuspectId != null && (
+        <div className="p-4 border-b border-noir-border/30">
+          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Kılık Değiştirme Kartım</div>
+          <div className="flex items-center gap-3">
+            <SuspectCard suspect={suspect(killer.disguiseCardSuspectId)} size={48} showName={false} state="disguise" playerRole="killer" />
+            <div>
+              <div className="font-body text-sm text-noir-text font-semibold">{suspect(killer.disguiseCardSuspectId).name}</div>
+              <div className="font-mono text-[10px] text-purple-400">Kılık değiştirince bu olacaksın</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Aksiyonlar */}
       {humanCanAct && (phase === PHASE.KILLER_PICK_IDENTITY || phase === PHASE.KILLER_PICK_DISGUISE) && isHumanKiller && (
         <div className="p-4 border-b border-noir-border/30 bg-yellow-900/10">
