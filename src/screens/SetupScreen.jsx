@@ -1,11 +1,19 @@
-export default function SetupScreen({ onStart }) {
+export default function SetupScreen({ onStart, onBack }) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
 
-      {/* Title */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-5 left-5 font-mono text-xs text-noir-muted hover:text-noir-text transition-colors"
+        >
+          ← Geri
+        </button>
+      )}
+
       <div className="mb-12 text-center anim-fade-in">
         <div className="font-mono text-xs tracking-[0.3em] text-noir-muted mb-3 uppercase">
-          Dedüksiyon Oyunu
+          Tek Oyunculu
         </div>
         <h1 className="font-display text-7xl font-bold text-noir-text anim-flicker mb-2">
           NOIR
@@ -13,7 +21,6 @@ export default function SetupScreen({ onStart }) {
         <div className="w-16 h-px bg-noir-accent mx-auto" />
       </div>
 
-      {/* Role selection */}
       <div className="w-full max-w-sm space-y-3 anim-fade-in" style={{ animationDelay: '0.15s' }}>
         <p className="font-mono text-xs text-noir-muted text-center tracking-widest uppercase mb-5">
           — Rolünü seç —
@@ -21,14 +28,9 @@ export default function SetupScreen({ onStart }) {
 
         <button
           onClick={() => onStart('killer')}
-          className="
-            w-full flex items-start gap-4 p-5
-            bg-noir-card border border-noir-border rounded-xl
-            hover:border-noir-red hover:bg-[#1A1218]
-            transition-all duration-200 group text-left
-          "
+          className="w-full flex items-start gap-4 p-5 bg-noir-card border border-noir-border rounded-xl hover:border-noir-red hover:bg-[#1A1218] transition-all duration-200 group text-left"
         >
-          <div className="text-3xl mt-0.5">🔪</div>
+          <div className="text-3xl mt-0.5">🗡️</div>
           <div>
             <div className="font-display text-lg text-noir-text group-hover:text-[#E05040] transition-colors">
               Katil
@@ -41,12 +43,7 @@ export default function SetupScreen({ onStart }) {
 
         <button
           onClick={() => onStart('inspector')}
-          className="
-            w-full flex items-start gap-4 p-5
-            bg-noir-card border border-noir-border rounded-xl
-            hover:border-noir-blue hover:bg-[#111820]
-            transition-all duration-200 group text-left
-          "
+          className="w-full flex items-start gap-4 p-5 bg-noir-card border border-noir-border rounded-xl hover:border-noir-blue hover:bg-[#111820] transition-all duration-200 group text-left"
         >
           <div className="text-3xl mt-0.5">🔍</div>
           <div>
@@ -60,9 +57,8 @@ export default function SetupScreen({ onStart }) {
         </button>
       </div>
 
-      {/* Footer note */}
       <p className="mt-10 font-mono text-[10px] text-noir-faint text-center anim-fade-in" style={{ animationDelay: '0.3s' }}>
-        Yapay zeka karşı rolü oynar · Tek oyunculu prototip
+        Yapay zeka karşı rolü oynar
       </p>
     </div>
   );
