@@ -23,12 +23,10 @@ import {
   playDisguiseSound,
 } from '../utils/audio.js';
 
-// Benzersiz oda ID'si üret
 function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// Game state'i Supabase'e yazılacak formata dönüştür
 function serializePublicState(game) {
   return {
     phase: game.phase,
@@ -44,7 +42,6 @@ function serializePublicState(game) {
   };
 }
 
-// Supabase'den gelen veriyi game state'e dönüştür
 function deserializePublicState(row, localSecrets) {
   return {
     phase: row.phase,
@@ -67,16 +64,31 @@ function deserializePublicState(row, localSecrets) {
   };
 }
 
-export function useMultiplayer() {
-  const [roomId, setRoomId] = useState(null);
-  const [myRole, setMyRole] = useState(null); // 'killer' | 'inspector'
-  const [userId, setUserId] = useState(null);
-  const [game, setGame] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle | creating | waiting | playing | ended
-  const [error, setError] = useState(null);
+function calcActiveSide(role, phase, turn) {
+  if (role === 'killer') {
+    return [PHASE.KILLER_PICK_IDENTITY, PHASE.KILLER_FIRST_KILL, PHASE.KILLER_PICK_DISGUISE].includes(phase) ||
+      (phase === PHASE.PLAY && turn === TURN.KILLER)
+      ? 'human' : 'opponent';
+  }
+  return (phase === PHASE.INSPECTOR_PICK_IDENTITY) ||
+    (phase === PHASE.PLAY && turn === TURN.INSPECTOR)
+    ? 'human' : 'opponent';
+}
 
-  // Gizli bilgileri sadece local'de tut
-  const localSecretsRef = useRef(null);
+export function useMultiplayer() {
+  const [roomId, setRoomId]   = useState(null);
+  const [myRole, setMyRole]   = useState(null);
+  const [userId, setUserId]   = useState(null);
+  const [game, setGame]       = useState(null);
+  const [status, setStatus]   = useState('idle');
+  const [error, setError]     = useState(null);
+  const localSecretsRef       = useRef(null);
+  const myRoleRef             = useRef(null);
+  const roomIdRef             = useRef(null);
+
+  // myRole ve roomId'yi ref'e de yaz — closure'larda güncel değer için
+  useEffect(() => { myRoleRef.current = myRole; }, [myRole]);
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
 
   // Anonim giriş
   useEffect(() => {
@@ -92,7 +104,7 @@ export function useMultiplayer() {
     });
   }, []);
 
-  // Realtime subscription — oda değişikliklerini dinle
+  // Realtime subscription
   useEffect(() => {
     if (!roomId) return;
 
@@ -103,66 +115,72 @@ export function useMultiplayer() {
         schema: 'public',
         table: 'rooms',
         filter: `id=eq.${roomId}`,
-      }, (payload) => {
+      }, async (payload) => {
         const row = payload.new;
+        const role = myRoleRef.current;
 
-        // Karşı tarafın hamlesi geldi, local state'i güncelle
-        if (localSecretsRef.current) {
-          const updated = deserializePublicState(row, localSecretsRef.current);
-          // activeSide hesapla
-          const isMyTurn =
-            (myRole === 'killer' && updated.turn === TURN.KILLER) ||
-            (myRole === 'inspector' && updated.turn === TURN.INSPECTOR) ||
-            (myRole === 'killer' && updated.phase === PHASE.KILLER_PICK_IDENTITY) ||
-            (myRole === 'killer' && updated.phase === PHASE.KILLER_FIRST_KILL) ||
-            (myRole === 'killer' && updated.phase === PHASE.KILLER_PICK_DISGUISE) ||
-            (myRole === 'inspector' && updated.phase === PHASE.INSPECTOR_PICK_IDENTITY);
-
-          updated.activeSide = isMyTurn ? 'human' : 'opponent';
-          updated.humanRole = myRole;
-          setGame(updated);
-
-          if (row.game_over) setStatus('ended');
+        // Dedektif katıldı — katil tarafında oyunu başlat
+        if (row.phase === 'waiting' && row.inspector_user_id && role === 'killer') {
+          await startGameAfterBothJoined(row);
+          return;
         }
 
-        // Dedektif katıldı — oyunu başlat
-        if (row.phase === 'waiting' && row.inspector_user_id && myRole === 'killer') {
-          startGameAfterBothJoined(row);
+        // Dedektif: inspector_secrets henüz yazılmamış olabilir, bekle
+        if (role === 'inspector' && !localSecretsRef.current?.inspector?.hand?.length) {
+          // Sırrı çekmeyi dene
+          const { data: secret } = await supabase
+            .from('inspector_secrets')
+            .select('*')
+            .eq('room_id', roomIdRef.current)
+            .single();
+
+          if (secret) {
+            localSecretsRef.current = {
+              ...localSecretsRef.current,
+              inspector: {
+                secretIdentitySuspectId: secret.identity_suspect_id ?? null,
+                hand: secret.hand ?? [],
+              },
+            };
+          }
         }
+
+        if (!localSecretsRef.current) return;
+
+        const activeSide = calcActiveSide(role, row.phase, row.turn);
+        const updated = deserializePublicState(row, localSecretsRef.current);
+        updated.activeSide = activeSide;
+        updated.humanRole  = role;
+        setGame(updated);
+        if (row.game_over) setStatus('ended');
       })
       .subscribe();
 
     return () => supabase.removeChannel(channel);
-  }, [roomId, myRole]);
+  }, [roomId]);
 
-  // Her iki oyuncu da katıldıktan sonra oyunu başlat (katil tarafında)
-  async function startGameAfterBothJoined(row) {
+  async function startGameAfterBothJoined() {
+    const rid = roomIdRef.current;
     const initialGame = createClassicGame('killer');
-
-    // Public state'i Supabase'e yaz
     const publicState = serializePublicState(initialGame);
-    await supabase.from('rooms').update({
-      ...publicState,
-      phase: initialGame.phase,
-    }).eq('id', roomId);
 
-    // Katil sırrını Supabase'e yaz
+    await supabase.from('rooms').update({ ...publicState }).eq('id', rid);
+
     await supabase.from('killer_secrets').upsert({
-      room_id: roomId,
+      room_id: rid,
       identity_suspect_id: initialGame.killer.identitySuspectId,
       disguise_card_id: initialGame.killer.disguiseCardSuspectId,
       hand: initialGame.killer.hand,
     });
 
-    // Dedektif sırrını Supabase'e yaz
     await supabase.from('inspector_secrets').upsert({
-      room_id: roomId,
+      room_id: rid,
       identity_suspect_id: initialGame.inspector.secretIdentitySuspectId,
       hand: initialGame.inspector.hand,
     });
 
     localSecretsRef.current = {
-      killer: initialGame.killer,
+      killer:    initialGame.killer,
       inspector: { secretIdentitySuspectId: null, hand: [] },
       humanRole: 'killer',
       activeSide: 'human',
@@ -172,12 +190,11 @@ export function useMultiplayer() {
     setStatus('playing');
   }
 
-  // Oda oluştur (katil)
+  // Oda oluştur
   const createRoom = useCallback(async () => {
     if (!userId) return;
     setStatus('creating');
     setError(null);
-
     const id = generateRoomId();
 
     const { error: roomError } = await supabase.from('rooms').insert({
@@ -203,43 +220,59 @@ export function useMultiplayer() {
     setStatus('waiting');
   }, [userId]);
 
-  // Odaya katıl (dedektif)
+  // Odaya katıl
   const joinRoom = useCallback(async (id) => {
     if (!userId) return;
     setError(null);
+    const upper = id.toUpperCase().trim();
 
     const { data: room, error: fetchError } = await supabase
       .from('rooms')
       .select('*')
-      .eq('id', id.toUpperCase())
+      .eq('id', upper)
       .single();
 
     if (fetchError || !room) {
-      setError('Oda bulunamadı. Kod doğru mu?');
+      setError('Oda bulunamadı. Kodu kontrol et.');
       return;
     }
 
-    if (room.inspector_user_id) {
+    // Aynı kullanıcı zaten katil olarak bu odadaysa engelle
+    if (room.killer_user_id === userId) {
+      setError('Bu odayı sen oluşturdun, farklı bir cihazdan katıl.');
+      return;
+    }
+
+    // inspector_user_id dolu ama bu kullanıcı değilse — oda dolu
+    if (room.inspector_user_id && room.inspector_user_id !== userId) {
       setError('Bu oda dolu.');
       return;
     }
 
-    const { error: joinError } = await supabase
-      .from('rooms')
-      .update({ inspector_user_id: userId })
-      .eq('id', id.toUpperCase());
+    // Henüz katılmamışsa katıl
+    if (!room.inspector_user_id) {
+      const { error: joinError } = await supabase
+        .from('rooms')
+        .update({ inspector_user_id: userId })
+        .eq('id', upper);
 
-    if (joinError) {
-      setError('Odaya katılınamadı.');
-      return;
+      if (joinError) {
+        setError('Odaya katılınamadı: ' + joinError.message);
+        return;
+      }
     }
 
-    // Dedektif sırrını Supabase'den çek
-    const { data: inspectorSecret } = await supabase
-      .from('inspector_secrets')
-      .select('*')
-      .eq('room_id', id.toUpperCase())
-      .single();
+    // inspector_secrets hazır olana kadar bekle (katil oyunu başlatmış olabilir)
+    let inspectorSecret = null;
+    for (let i = 0; i < 10; i++) {
+      const { data } = await supabase
+        .from('inspector_secrets')
+        .select('*')
+        .eq('room_id', upper)
+        .single();
+      if (data) { inspectorSecret = data; break; }
+      await new Promise(r => setTimeout(r, 600));
+    }
 
     localSecretsRef.current = {
       killer: { identitySuspectId: null, disguiseCardSuspectId: null, hand: [] },
@@ -248,81 +281,70 @@ export function useMultiplayer() {
         hand: inspectorSecret?.hand ?? [],
       },
       humanRole: 'inspector',
-      activeSide: 'opponent', // Katil başlar
+      activeSide: 'opponent',
     };
 
-    setRoomId(id.toUpperCase());
+    setRoomId(upper);
     setMyRole('inspector');
     setStatus('playing');
 
-    // Mevcut oda state'ini yükle
-    if (room.board && room.board.length > 0) {
-      const loaded = deserializePublicState(room, localSecretsRef.current);
-      loaded.humanRole = 'inspector';
-      loaded.activeSide = 'opponent';
+    // Güncel oda state'ini yükle
+    const { data: freshRoom } = await supabase
+      .from('rooms').select('*').eq('id', upper).single();
+
+    if (freshRoom?.board?.length) {
+      const loaded = deserializePublicState(freshRoom, localSecretsRef.current);
+      loaded.humanRole  = 'inspector';
+      loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
       setGame(loaded);
     }
   }, [userId]);
 
-  // Supabase'e hamle yaz
+  // Supabase'e yaz
   async function pushState(nextGame) {
-    if (!roomId) return;
-    const publicState = serializePublicState(nextGame);
-    await supabase.from('rooms').update(publicState).eq('id', roomId);
+    const rid  = roomIdRef.current;
+    const role = myRoleRef.current;
+    if (!rid) return;
 
-    // Gizli bilgileri güncelle
-    if (myRole === 'killer') {
+    await supabase.from('rooms').update(serializePublicState(nextGame)).eq('id', rid);
+
+    if (role === 'killer') {
       await supabase.from('killer_secrets').upsert({
-        room_id: roomId,
+        room_id: rid,
         identity_suspect_id: nextGame.killer.identitySuspectId,
         disguise_card_id: nextGame.killer.disguiseCardSuspectId,
         hand: nextGame.killer.hand,
       });
     } else {
       await supabase.from('inspector_secrets').upsert({
-        room_id: roomId,
+        room_id: rid,
         identity_suspect_id: nextGame.inspector.secretIdentitySuspectId,
         hand: nextGame.inspector.hand,
       });
     }
   }
 
-  // Hamle yap — local state güncelle + Supabase'e yaz
   function applyAndPush(applyFn, soundFn) {
     setGame((prev) => {
       if (!prev) return prev;
       const { ok, game: next } = applyFn(prev);
       if (!ok) return prev;
       if (soundFn) soundFn();
-      // Sıra karşıya geçti, activeSide güncelle
-      const isMyTurnNext =
-        (myRole === 'killer' && next.turn === TURN.KILLER) ||
-        (myRole === 'inspector' && next.turn === TURN.INSPECTOR) ||
-        (myRole === 'killer' && [PHASE.KILLER_PICK_IDENTITY, PHASE.KILLER_FIRST_KILL, PHASE.KILLER_PICK_DISGUISE].includes(next.phase)) ||
-        (myRole === 'inspector' && next.phase === PHASE.INSPECTOR_PICK_IDENTITY);
-      const withSide = { ...next, activeSide: isMyTurnNext ? 'human' : 'opponent', humanRole: myRole };
+      const role = myRoleRef.current;
+      const withSide = {
+        ...next,
+        activeSide: calcActiveSide(role, next.phase, next.turn),
+        humanRole: role,
+      };
       pushState(withSide);
       return withSide;
     });
   }
 
-  const setPending = useCallback((action) => {
-    setGame((g) => g ? { ...g, pendingAction: action, pendingShift: null } : g);
-  }, []);
-
-  const cancelPending = useCallback(() => {
-    setGame((g) => g ? { ...g, pendingAction: null, pendingShift: null, pendingExonerateDiscard: null } : g);
-  }, []);
-
-  const beginShift = useCallback(() => {
-    setGame((g) => g ? { ...g, pendingAction: 'shift', pendingShift: { step: 'axis' } } : g);
-  }, []);
-
-  const selectShiftLine = useCallback((axis, index) => {
-    setGame((g) => g?.pendingAction === 'shift'
-      ? { ...g, pendingShift: { step: 'direction', axis, index } }
-      : g);
-  }, []);
+  const setPending        = useCallback((a) => setGame(g => g ? { ...g, pendingAction: a, pendingShift: null } : g), []);
+  const cancelPending     = useCallback(() => setGame(g => g ? { ...g, pendingAction: null, pendingShift: null, pendingExonerateDiscard: null } : g), []);
+  const beginShift        = useCallback(() => setGame(g => g ? { ...g, pendingAction: 'shift', pendingShift: { step: 'axis' } } : g), []);
+  const selectShiftLine   = useCallback((axis, index) => setGame(g => g?.pendingAction === 'shift' ? { ...g, pendingShift: { step: 'direction', axis, index } } : g), []);
 
   const selectShiftDirection = useCallback((direction) => {
     setGame((prev) => {
@@ -331,20 +353,21 @@ export function useMultiplayer() {
       const { ok, game: next } = applyShift(prev, axis, index, direction);
       if (!ok) return prev;
       playShiftSound();
-      const withSide = { ...next, activeSide: 'opponent', humanRole: myRole };
+      const role = myRoleRef.current;
+      const withSide = { ...next, activeSide: calcActiveSide(role, next.phase, next.turn), humanRole: role };
       pushState(withSide);
       return withSide;
     });
-  }, [myRole, roomId]);
+  }, []);
 
-  const pickKillerIdentity = useCallback((cardSuspectId) => {
+  const pickKillerIdentity = useCallback((id) => {
     applyAndPush(
       (prev) => prev.phase === PHASE.KILLER_PICK_DISGUISE
-        ? applyKillerPickDisguise(prev, cardSuspectId)
-        : applyKillerPickIdentity(prev, cardSuspectId),
+        ? applyKillerPickDisguise(prev, id)
+        : applyKillerPickIdentity(prev, id),
       playClickSound
     );
-  }, [myRole, roomId]);
+  }, []);
 
   const executeBoardAction = useCallback((r, c) => {
     setGame((prev) => {
@@ -352,93 +375,41 @@ export function useMultiplayer() {
       const secrets = getActingSecrets(prev);
       const suspectId = prev.board[r]?.[c]?.suspectId;
       if (suspectId == null) return prev;
-
-      let result;
-      let soundFn;
-
+      let result, soundFn;
       if (prev.pendingAction === 'kill') {
-        result = applyKill(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        result  = applyKill(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         soundFn = result.ok ? playKillSound : null;
       } else if (prev.pendingAction === 'arrest') {
-        result = applyArrest(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
-        if (result.ok) {
-          soundFn = result.game.gameOver && result.game.winner === 'inspector'
-            ? playArrestSuccessSound
-            : playArrestFailSound;
-        }
+        result  = applyArrest(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        soundFn = result.ok ? (result.game.gameOver && result.game.winner === 'inspector' ? playArrestSuccessSound : playArrestFailSound) : null;
       } else return prev;
-
       if (!result?.ok) return prev;
       if (soundFn) soundFn();
-      const withSide = { ...result.game, activeSide: 'opponent', humanRole: myRole };
+      const role = myRoleRef.current;
+      const withSide = { ...result.game, activeSide: calcActiveSide(role, result.game.phase, result.game.turn), humanRole: role };
       pushState(withSide);
       return withSide;
     });
-  }, [myRole, roomId]);
-
-  const pickInspectorIdentity = useCallback((cardSuspectId) => {
-    applyAndPush(
-      (prev) => applyInspectorPickIdentity(prev, cardSuspectId),
-      playClickSound
-    );
-  }, [myRole, roomId]);
-
-  const beginExonerate = useCallback(() => {
-    setGame((g) => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g);
   }, []);
 
-  const completeExonerate = useCallback((discardId) => {
-    applyAndPush(
-      (prev) => applyExonerate(prev, discardId),
-      playClickSound
-    );
-  }, [myRole, roomId]);
-
-  const executeDisguise = useCallback(() => {
-    applyAndPush(
-      (prev) => applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId),
-      playDisguiseSound
-    );
-  }, [myRole, roomId]);
+  const pickInspectorIdentity = useCallback((id) => applyAndPush((prev) => applyInspectorPickIdentity(prev, id), playClickSound), []);
+  const beginExonerate        = useCallback(() => setGame(g => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g), []);
+  const completeExonerate     = useCallback((id) => applyAndPush((prev) => applyExonerate(prev, id), playClickSound), []);
+  const executeDisguise       = useCallback(() => applyAndPush((prev) => applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId), playDisguiseSound), []);
 
   const leaveRoom = useCallback(() => {
-    setRoomId(null);
-    setMyRole(null);
-    setGame(null);
-    setStatus('idle');
+    setRoomId(null); setMyRole(null); setGame(null);
+    setStatus('idle'); setError(null);
     localSecretsRef.current = null;
   }, []);
 
   return {
-    // Oda yönetimi
-    roomId,
-    myRole,
-    userId,
-    status,
-    error,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-
-    // Oyun state
-    game,
-    isCoordTargetable,
-    getActingSecrets,
-
-    // Aksiyonlar
-    setPending,
-    cancelPending,
-    beginShift,
-    selectShiftLine,
-    selectShiftDirection,
-    pickKillerIdentity,
-    executeBoardAction,
-    pickInspectorIdentity,
-    beginExonerate,
-    completeExonerate,
-    executeDisguise,
-
-    // Multiplayer'da AI yok
-    runAiTurn: () => {},
+    roomId, myRole, userId, status, error,
+    createRoom, joinRoom, leaveRoom,
+    game, isCoordTargetable, getActingSecrets,
+    setPending, cancelPending, beginShift, selectShiftLine,
+    selectShiftDirection, pickKillerIdentity, executeBoardAction,
+    pickInspectorIdentity, beginExonerate, completeExonerate,
+    executeDisguise, runAiTurn: () => {},
   };
 }
