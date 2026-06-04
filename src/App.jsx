@@ -110,24 +110,23 @@ export default function App() {
 
   // ── MULTIPLAYER ───────────────────────────────────────────────────────────
   if (mode === 'multi') {
-    // Lobby
-    if (!multi.game || multi.status === 'waiting') {
-      return (
-        <div className="grain">
-          <LobbyScreen
-            status={multi.status}
-            error={multi.error}
-            roomId={multi.roomId}
-            onCreateRoom={multi.createRoom}
-            onJoinRoom={multi.joinRoom}
-            onBack={() => setMode('menu')}
-          />
-        </div>
-      );
-    }
+if (multi.status === 'waiting' || !multi.game) {
+  return (
+    <div className="grain">
+      <LobbyScreen
+        status={multi.status}
+        error={multi.error}
+        roomId={multi.roomId}
+        onCreateRoom={multi.createRoom}
+        onJoinRoom={multi.joinRoom}
+        onBack={() => setMode('menu')}
+      />
+    </div>
+  );
+}
 
     // Oyun bitti
-    if (multi.game.gameOver) {
+    if (multi.game?.gameOver) {
       return (
         <div className="grain">
           <EndScreen

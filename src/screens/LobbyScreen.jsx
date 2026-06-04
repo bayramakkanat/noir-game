@@ -99,8 +99,11 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, status, error, r
             className="w-full px-4 py-3 rounded-lg bg-noir-bg border border-noir-border text-noir-text font-mono text-lg tracking-[0.3em] placeholder:text-noir-faint placeholder:tracking-normal focus:outline-none focus:border-noir-blue mb-3"
           />
           <button
-            onClick={() => onJoinRoom(joinCode)}
-            disabled={joinCode.length < 4}
+            onClick={() => {
+  console.log('TIKLA', joinCode, typeof onJoinRoom);
+  onJoinRoom(joinCode);
+}}
+           // disabled={joinCode.length < 4}
             className="w-full py-3 rounded-lg border border-[#2980B944] text-[#4090C8] bg-[#101418] hover:border-[#2980B988] font-mono text-sm tracking-wide transition-all disabled:opacity-40"
           >
             Katıl

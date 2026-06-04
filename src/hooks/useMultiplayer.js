@@ -85,8 +85,8 @@ export function useMultiplayer() {
   const localSecretsRef       = useRef(null);
   const myRoleRef             = useRef(null);
   const roomIdRef             = useRef(null);
+  const killerPollRef         = useRef(null); // polling interval ref (katil tarafı)
 
-  // myRole ve roomId'yi ref'e de yaz — closure'larda güncel değer için
   useEffect(() => { myRoleRef.current = myRole; }, [myRole]);
   useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
 
@@ -104,7 +104,9 @@ export function useMultiplayer() {
     });
   }, []);
 
-  // Realtime subscription
+  // Realtime subscription — sadece dedektif tarafı için oyun güncellemelerini dinler.
+  // Katil tarafı kendi polling döngüsünden oyunu başlatır,
+  // oyun başladıktan sonra o da buradan güncelleme alır.
   useEffect(() => {
     if (!roomId) return;
 
@@ -118,37 +120,16 @@ export function useMultiplayer() {
       }, async (payload) => {
         const row = payload.new;
         const role = myRoleRef.current;
+        const secrets = localSecretsRef.current;
 
-        // Dedektif katıldı — katil tarafında oyunu başlat
-        if (row.phase === 'waiting' && row.inspector_user_id && role === 'killer') {
-          await startGameAfterBothJoined(row);
-          return;
-        }
+        // Oyun henüz başlamamışsa (phase hâlâ 'waiting') güncelleme işleme
+        if (row.phase === 'waiting') return;
 
-        // Dedektif: inspector_secrets henüz yazılmamış olabilir, bekle
-        if (role === 'inspector' && !localSecretsRef.current?.inspector?.hand?.length) {
-          // Sırrı çekmeyi dene
-          const { data: secret } = await supabase
-            .from('inspector_secrets')
-            .select('*')
-            .eq('room_id', roomIdRef.current)
-            .single();
-
-          if (secret) {
-            localSecretsRef.current = {
-              ...localSecretsRef.current,
-              inspector: {
-                secretIdentitySuspectId: secret.identity_suspect_id ?? null,
-                hand: secret.hand ?? [],
-              },
-            };
-          }
-        }
-
-        if (!localSecretsRef.current) return;
+        // Secrets henüz hazır değilse işleme
+        if (!secrets) return;
 
         const activeSide = calcActiveSide(role, row.phase, row.turn);
-        const updated = deserializePublicState(row, localSecretsRef.current);
+        const updated = deserializePublicState(row, secrets);
         updated.activeSide = activeSide;
         updated.humanRole  = role;
         setGame(updated);
@@ -159,13 +140,31 @@ export function useMultiplayer() {
     return () => supabase.removeChannel(channel);
   }, [roomId]);
 
-  async function startGameAfterBothJoined() {
-    const rid = roomIdRef.current;
+  // Katil: dedektifin katılmasını polling ile bekle, ardından oyunu başlat
+  async function pollForInspectorAndStart(rid) {
+    // Önceki varsa temizle
+    if (killerPollRef.current) clearInterval(killerPollRef.current);
+
+    killerPollRef.current = setInterval(async () => {
+      const { data: room } = await supabase
+        .from('rooms')
+        .select('inspector_user_id')
+        .eq('id', rid)
+        .single();
+
+      if (room?.inspector_user_id) {
+        clearInterval(killerPollRef.current);
+        killerPollRef.current = null;
+        await startGameAfterBothJoined(rid);
+      }
+    }, 1500);
+  }
+
+  async function startGameAfterBothJoined(rid) {
     const initialGame = createClassicGame('killer');
     const publicState = serializePublicState(initialGame);
 
-    await supabase.from('rooms').update({ ...publicState }).eq('id', rid);
-
+    // Önce sırları yaz — dedektif bunları bekliyor
     await supabase.from('killer_secrets').upsert({
       room_id: rid,
       identity_suspect_id: initialGame.killer.identitySuspectId,
@@ -178,6 +177,9 @@ export function useMultiplayer() {
       identity_suspect_id: initialGame.inspector.secretIdentitySuspectId,
       hand: initialGame.inspector.hand,
     });
+
+    // Sırlar yazıldıktan SONRA public state'i güncelle (dedektif artık secrets'ı bulabilir)
+    await supabase.from('rooms').update({ ...publicState }).eq('id', rid);
 
     localSecretsRef.current = {
       killer:    initialGame.killer,
@@ -218,9 +220,12 @@ export function useMultiplayer() {
     setRoomId(id);
     setMyRole('killer');
     setStatus('waiting');
+
+    // Dedektifin katılmasını polling ile bekle
+    pollForInspectorAndStart(id);
   }, [userId]);
 
-  // Odaya katıl
+  // Odaya katıl (dedektif)
   const joinRoom = useCallback(async (id) => {
     if (!userId) return;
     setError(null);
@@ -237,19 +242,17 @@ export function useMultiplayer() {
       return;
     }
 
-    // Aynı kullanıcı zaten katil olarak bu odadaysa engelle
     if (room.killer_user_id === userId) {
       setError('Bu odayı sen oluşturdun, farklı bir cihazdan katıl.');
       return;
     }
 
-    // inspector_user_id dolu ama bu kullanıcı değilse — oda dolu
     if (room.inspector_user_id && room.inspector_user_id !== userId) {
       setError('Bu oda dolu.');
       return;
     }
 
-    // Henüz katılmamışsa katıl
+    // Odaya katıl — bu katil tarafındaki polling'i tetikler
     if (!room.inspector_user_id) {
       const { error: joinError } = await supabase
         .from('rooms')
@@ -262,23 +265,28 @@ export function useMultiplayer() {
       }
     }
 
-    // inspector_secrets hazır olana kadar bekle (katil oyunu başlatmış olabilir)
+    // Katil secrets'ları yazana kadar bekle (max ~15sn)
     let inspectorSecret = null;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 25; i++) {
       const { data } = await supabase
         .from('inspector_secrets')
         .select('*')
         .eq('room_id', upper)
         .single();
-      if (data) { inspectorSecret = data; break; }
+      if (data?.hand?.length > 0) { inspectorSecret = data; break; }
       await new Promise(r => setTimeout(r, 600));
+    }
+
+    if (!inspectorSecret) {
+      setError('Katil hazırlık yapamadı, tekrar dene.');
+      return;
     }
 
     localSecretsRef.current = {
       killer: { identitySuspectId: null, disguiseCardSuspectId: null, hand: [] },
       inspector: {
-        secretIdentitySuspectId: inspectorSecret?.identity_suspect_id ?? null,
-        hand: inspectorSecret?.hand ?? [],
+        secretIdentitySuspectId: inspectorSecret.identity_suspect_id ?? null,
+        hand: inspectorSecret.hand ?? [],
       },
       humanRole: 'inspector',
       activeSide: 'opponent',
@@ -288,11 +296,11 @@ export function useMultiplayer() {
     setMyRole('inspector');
     setStatus('playing');
 
-    // Güncel oda state'ini yükle
+    // Güncel oyun state'ini yükle
     const { data: freshRoom } = await supabase
       .from('rooms').select('*').eq('id', upper).single();
 
-    if (freshRoom?.board?.length) {
+    if (freshRoom) {
       const loaded = deserializePublicState(freshRoom, localSecretsRef.current);
       loaded.humanRole  = 'inspector';
       loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
@@ -398,6 +406,11 @@ export function useMultiplayer() {
   const executeDisguise       = useCallback(() => applyAndPush((prev) => applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId), playDisguiseSound), []);
 
   const leaveRoom = useCallback(() => {
+    // Katil polling varsa durdur
+    if (killerPollRef.current) {
+      clearInterval(killerPollRef.current);
+      killerPollRef.current = null;
+    }
     setRoomId(null); setMyRole(null); setGame(null);
     setStatus('idle'); setError(null);
     localSecretsRef.current = null;
