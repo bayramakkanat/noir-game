@@ -73,29 +73,32 @@ export function usePeerMultiplayer() {
 
   // Game state serialization (gizli bilgiler olmadan)
   const serializeGameState = useCallback((game) => ({
-    phase: game.phase,
-    turn: game.turn,
-    board: game.board,
-    publicExonerated: game.publicExonerated,
-    lastShift: game.lastShift,
-    logs: game.logs,
-    evidenceDeck: game.evidenceDeck,
-    discardPile: game.discardPile,
-    gameOver: game.gameOver,
-    winner: game.winner,
-    killCount: game.killCount,
-    killedSuspectIds: game.killedSuspectIds,
-    killSites: game.killSites,
-    // Killer bilgileri (gizli olmayanlar)
-    killer: {
-      disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
-      hand: game.killer.hand,
-    },
-    // Inspector bilgileri (gizli olmayanlar)
-    inspector: {
-      hand: game.inspector.hand,
-    },
-  }), []);
+  phase: game.phase,
+  turn: game.turn,
+  board: game.board,
+  publicExonerated: game.publicExonerated,
+  lastShift: game.lastShift,
+  // 🔥 DÜZELTME: Gizli bilgi içeren logları filtrele
+  logs: game.logs.filter(log => 
+    !log.includes('Gizli kimliğin') && 
+    !log.includes('Kılık değiştirdin. Yeni kimliğin') &&
+    !log.includes('Yeni kimliğin')
+  ),
+  evidenceDeck: game.evidenceDeck,
+  discardPile: game.discardPile,
+  gameOver: game.gameOver,
+  winner: game.winner,
+  killCount: game.killCount,
+  killedSuspectIds: game.killedSuspectIds,
+  killSites: game.killSites,
+  killer: {
+    disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
+    hand: game.killer.hand,
+  },
+  inspector: {
+    hand: game.inspector.hand,
+  },
+}), []);
 
   // Hamleyi serialization
   const serializeAction = useCallback((type, payload, newGameState) => ({
