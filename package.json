@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && mkdir -p .vercel/output/static && cp -r dist/* .vercel/output/static/ 2>/dev/null || (mkdir .vercel && mkdir .vercel\\output && mkdir .vercel\\output\\static && xcopy dist .vercel\\output\\static /E /I /Y)",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
