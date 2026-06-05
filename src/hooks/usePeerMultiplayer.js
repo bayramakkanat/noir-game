@@ -137,23 +137,33 @@ export function usePeerMultiplayer() {
       console.log('Aksiyon geldi:', type, payload);
       
       setGame(prev => {
-        if (!prev) return prev;
-        
-        // Gelen yeni state'i uygula, sadece gizli bilgileri koru
-        const updatedGame = {
-          ...newGameState,
-          // Kendi gizli bilgilerini koru
-          killer: {
-            ...newGameState.killer,
-            identitySuspectId: prev.killer.identitySuspectId,
+      if (!prev) return prev;
+      const role = myRoleRef.current;
+
+      // Gelen state'i uygula.
+      // Kendi GİZLİ bilgini koru (karşı taraf bunu null göndermiş olabilir).
+      // Ama karşı tarafın kimliği artık serializeGameState içinde geliyor — onu kabul et.
+      const updatedGame = {
+      ...newGameState,
+      killer: {
+        ...newGameState.killer,
+        // Katilsek kendi kimliğimizi biliyoruz, dedektifsek gelen değeri kullan
+      identitySuspectId:
+        role === 'killer'
+            ? prev.killer.identitySuspectId
+            : newGameState.killer.identitySuspectId,
+        },
+        inspector: {
+          ...newGameState.inspector,
+            // Dedektifsek kendi gizli kimliğimizi biliyoruz, katilsek gelen değeri kullan
+            secretIdentitySuspectId:
+              role === 'inspector'
+                ? prev.inspector.secretIdentitySuspectId
+                : newGameState.inspector.secretIdentitySuspectId,
           },
-          inspector: {
-            ...newGameState.inspector,
-            secretIdentitySuspectId: prev.inspector.secretIdentitySuspectId,
-          },
-          humanRole: myRoleRef.current,
+          humanRole: role,
         };
-        
+
         return updatedGame;
       });
     }
