@@ -228,7 +228,7 @@ export default function App() {
   }
 
   if (mode === 'multi') {
-    if (multi.status === 'waiting' || !multi.game) {
+    if (multi.status === 'idle' || multi.status === 'creating' || multi.status === 'waiting' || multi.status === 'joining' || !multi.game) {
       return (
         <div className="grain">
           <LobbyScreen

@@ -349,6 +349,7 @@ export function useMultiplayer() {
   const joinRoom = useCallback(async (id) => {
     if (!userId) return;
     setError(null);
+    setStatus('joining');
     const upper = id.toUpperCase().trim();
 
     const { data: room, error: fetchError } = await supabase
@@ -359,16 +360,19 @@ export function useMultiplayer() {
 
     if (fetchError || !room) {
       setError('Oda bulunamadı. Kodu kontrol et.');
+      setStatus('idle');
       return;
     }
 
     if (room.killer_user_id === userId) {
       setError('Bu odayı sen oluşturdun, farklı bir cihazdan katıl.');
+      setStatus('idle');
       return;
     }
 
     if (room.inspector_user_id && room.inspector_user_id !== userId) {
       setError('Bu oda dolu.');
+      setStatus('idle');
       return;
     }
 
@@ -381,6 +385,7 @@ export function useMultiplayer() {
 
       if (joinError) {
         setError('Odaya katılınamadı: ' + joinError.message);
+        setStatus('idle');
         return;
       }
     }
@@ -399,10 +404,11 @@ export function useMultiplayer() {
 
     if (!inspectorSecret) {
       setError('Katil hazırlık yapamadı, tekrar dene.');
+      setStatus('idle');
       return;
     }
 
-    localSecretsRef.current = {
+    const secrets = {
       killer: { identitySuspectId: null, disguiseCardSuspectId: null, hand: [] },
       inspector: {
         secretIdentitySuspectId: inspectorSecret.identity_suspect_id ?? null,
@@ -411,23 +417,26 @@ export function useMultiplayer() {
       humanRole: 'inspector',
       activeSide: 'opponent',
     };
+    localSecretsRef.current = secrets;
+
+    // Güncel oyun state'ini yükle — setGame ve setStatus aynı anda
+    const { data: freshRoom } = await supabase
+      .from('rooms').select('*').eq('id', upper).single();
 
     setRoomId(upper);
-setMyRole('inspector');
+    setMyRole('inspector');
 
-const { data: freshRoom } = await supabase
-  .from('rooms').select('*').eq('id', upper).single();
+    if (freshRoom) {
+      const loaded = deserializePublicState(freshRoom, secrets);
+      loaded.humanRole  = 'inspector';
+      loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
+      // game'i set et, sonra status — App.jsx'te !multi.game koşulunu aşmak için
+      setGame(loaded);
+    }
 
-if (freshRoom) {
-  const loaded = deserializePublicState(freshRoom, localSecretsRef.current);
-  loaded.humanRole  = 'inspector';
-  loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
-  setGame(loaded);
-}
-
-// game set edildikten SONRA status'u değiştir
-setStatus('playing');
-startInspectorPolling(upper);
+    // game set edildikten sonra status'u 'playing' yap
+    setStatus('playing');
+    startInspectorPolling(upper);
   }, [userId]);
 
   // Supabase'e yaz

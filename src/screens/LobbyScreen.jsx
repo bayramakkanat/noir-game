@@ -7,6 +7,30 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
   const [joinCode, setJoinCode] = useState('');
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
+  // Katılma bekleme ekranı
+  if (status === 'joining') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#0A0A10]">
+        <AmbientBackground variant="lobby" density="full" className="z-0" />
+        <motion.div
+          className="text-center relative z-10"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="font-display text-6xl font-bold text-[#E8E6DC] anim-flicker mb-2">NOIR</h1>
+          <div className="w-16 h-px bg-[#4090C8] mx-auto mb-10" />
+          <div className="flex items-center gap-2 justify-center">
+            <div className="w-2 h-2 rounded-full bg-[#4090C8] anim-pulse" />
+            <p className="font-mono text-xs text-[#888898]">
+              Oyun başlatılıyor...
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   // Oda bekleme ekranı
   if (status === 'waiting') {
     return (
