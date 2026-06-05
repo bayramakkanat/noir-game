@@ -531,6 +531,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
     logs, pendingAction, board, killCount,
   } = game;
 
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   const humanCanAct = activeSide === 'human';
   const secrets = actions.getActingSecrets(game);
   const inPlay = phase === PHASE.PLAY;
@@ -584,11 +585,11 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
                 {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
               </div>
             )}
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-1.5 mt-2">
               {onQuit && (
                 <button
                   onClick={onQuit}
-                  className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-[11px] text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
                 >
                   ⌂ Ana Menü
                 </button>
@@ -596,7 +597,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
               <button
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-                className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-[11px] text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
               >
                 {isFullscreen ? '⛶ Küçült' : '⛶ Tam Ekran'}
               </button>

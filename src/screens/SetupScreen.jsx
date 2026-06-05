@@ -43,7 +43,7 @@ export default function SetupScreen({ onStart, onBack }) {
             title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
             className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
           >
-            {isFullscreen ? '⊡' : '⊞'}
+            {isFullscreen ? '⛶' : '⛶'}
           </button>
           <button
             type="button"

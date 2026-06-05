@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useFullscreen } from './hooks/useFullscreen.js';
 import menuBg from './assets/menu-bg.png';
 import tekImg from './assets/tek.png';
 import cokImg from './assets/cok.png';
@@ -82,6 +83,7 @@ function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageSc
 
 function MainMenu({ onSelect }) {
   const [rulesOpen, setRulesOpen] = useState(false);
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   return (
     <div
@@ -97,6 +99,16 @@ function MainMenu({ onSelect }) {
       <div className="absolute inset-0 bg-black/50 z-[2]" />
       <div className="absolute bottom-0 left-0 right-0 h-72 bg-gradient-to-t from-[#07070F] to-transparent z-[2] pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#07070F]/60 to-transparent z-[2] pointer-events-none" />
+
+      {/* Tam ekran butonu */}
+      <button
+        type="button"
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+        className="absolute top-5 right-5 z-10 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
+      >
+        {isFullscreen ? '⛶' : '⛶'}
+      </button>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
 
