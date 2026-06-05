@@ -78,7 +78,6 @@ export function usePeerMultiplayer() {
   board: game.board,
   publicExonerated: game.publicExonerated,
   lastShift: game.lastShift,
-  // 🔥 DÜZELTME: Gizli bilgi içeren logları filtrele
   logs: game.logs.filter(log => 
     !log.includes('Gizli kimliğin') && 
     !log.includes('Kılık değiştirdin. Yeni kimliğin') &&
@@ -92,10 +91,12 @@ export function usePeerMultiplayer() {
   killedSuspectIds: game.killedSuspectIds,
   killSites: game.killSites,
   killer: {
+    identitySuspectId: game.killer.identitySuspectId,        // 🔥 EKLE
     disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
     hand: game.killer.hand,
   },
   inspector: {
+    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId, // 🔥 EKLE
     hand: game.inspector.hand,
   },
 }), []);
