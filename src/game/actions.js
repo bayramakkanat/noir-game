@@ -160,7 +160,6 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   let next = { ...game, pendingAction: null };
   const name = suspectName(targetSuspectId);
 
-  // 🔥 DÜZELTME: killerIdentityId parametresi yerine game üzerindeki gerçek katil kimliğini kullan
   const realKillerId = game.killer.identitySuspectId;
   if (checkInspectorWinByArrest(targetSuspectId, realKillerId)) {
     next = addLog(next, `🔍 Tutuklama başarılı: <b>${name}</b> katildi!`);
@@ -168,9 +167,8 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   }
 
   next = addLog(next, `🔍 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
-  // ... aynı devam eder (investigated listesi güncellemesi vs)
-}
-  // Masum olduğu kanıtlanan karakteri investigated listesine ekle — AI bir daha denemez
+
+  // Masum olduğu kanıtlanan karakteri investigated listesine ekle
   next = {
     ...next,
     inspector: {
@@ -180,6 +178,7 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   };
   next = advanceTurnAfterAction(next);
   return { ok: true, game: next };
+}
 
 
 // ─── Exonerate ───────────────────────────────────────────────────────────────
