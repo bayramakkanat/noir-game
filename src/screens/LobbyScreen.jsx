@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useFullscreen } from '../hooks/useFullscreen.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import AmbientBackground from '../components/AmbientBackground.jsx';
 
 export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, error, roomId }) {
   const [joinCode, setJoinCode] = useState('');
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   // Oda bekleme ekranı
   if (status === 'waiting') {
@@ -19,6 +21,13 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
             ← Geri
           </button>
         )}
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+          className="absolute top-5 right-5 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-[#C0392B] hover:border-[#C0392B]/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center z-10"
+        >
+          {isFullscreen ? '⊡' : '⊞'}
+        </button>
 
         <motion.div
           className="text-center relative z-10"
@@ -70,6 +79,13 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           ← Geri
         </button>
       )}
+      <button
+        onClick={toggleFullscreen}
+        title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+        className="absolute top-5 right-5 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-[#C0392B] hover:border-[#C0392B]/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center z-10"
+      >
+        {isFullscreen ? '⊡' : '⊞'}
+      </button>
 
       <motion.div
         className="w-full max-w-sm relative z-10"

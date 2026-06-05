@@ -39,14 +39,14 @@ const GLOW_STYLES = {
     accent: 'rgba(200,168,75,0.08)',
   },
   lobby: {
-    top: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(192,57,43,0.22) 0%, transparent 70%)',
-    bottom: 'radial-gradient(ellipse 60% 40% at 50% 100%, rgba(64,144,200,0.14) 0%, transparent 70%)',
-    accent: 'rgba(192,57,43,0.06)',
+    top: 'radial-gradient(ellipse 90% 55% at 50% 0%, rgba(192,57,43,0.45) 0%, transparent 70%)',
+    bottom: 'radial-gradient(ellipse 70% 50% at 50% 100%, rgba(64,144,200,0.30) 0%, transparent 70%)',
+    accent: 'rgba(192,57,43,0.18)',
   },
   setup: {
-    top: 'radial-gradient(ellipse 75% 45% at 50% 0%, rgba(192,57,43,0.18) 0%, transparent 70%)',
-    bottom: 'radial-gradient(ellipse 55% 35% at 50% 100%, rgba(200,168,75,0.12) 0%, transparent 70%)',
-    accent: 'rgba(41,128,185,0.06)',
+    top: 'radial-gradient(ellipse 85% 52% at 50% 0%, rgba(192,57,43,0.38) 0%, transparent 70%)',
+    bottom: 'radial-gradient(ellipse 65% 42% at 50% 100%, rgba(200,168,75,0.28) 0%, transparent 70%)',
+    accent: 'rgba(41,128,185,0.16)',
   },
   game: {
     top: 'radial-gradient(ellipse 70% 40% at 50% 0%, rgba(200,168,75,0.1) 0%, transparent 72%)',
@@ -141,7 +141,7 @@ function AmbientGlow({ variant }) {
         className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[min(100vw,520px)] h-[min(60vh,320px)] rounded-full blur-3xl"
         style={{ background: glow.accent }}
         initial={{ opacity: 0.5, scale: 0.95 }}
-        animate={{ opacity: [0.45, 0.75, 0.45], scale: [0.95, 1.05, 0.95] }}
+        animate={{ opacity: [0.6, 0.95, 0.6], scale: [0.95, 1.08, 0.95] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
       />
     </div>
@@ -157,7 +157,7 @@ export default function AmbientBackground({
   density = 'medium',
   className = '',
 }) {
-  const maxOpacity = variant === 'game' ? 0.12 : variant === 'menu' ? 0.18 : 0.2;
+  const maxOpacity = variant === 'game' ? 0.12 : variant === 'menu' ? 0.22 : 0.30;
 
   return (
     <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`} aria-hidden>

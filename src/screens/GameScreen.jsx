@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
+import { useFullscreen } from '../hooks/useFullscreen.js';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { PHASE, TURN, CELL_STATUS } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
 import HowToPlayModal from '../components/HowToPlayModal.jsx';
-import AmbientBackground from '../components/AmbientBackground.jsx';
 
 const BOARD_LAYOUT_TRANSITION = {
   type: 'tween',
@@ -584,14 +584,23 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
                 {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
               </div>
             )}
-            {onQuit && (
+            <div className="flex items-center gap-2 mt-1">
+              {onQuit && (
+                <button
+                  onClick={onQuit}
+                  className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase"
+                >
+                  ⌂ Ana Menü
+                </button>
+              )}
               <button
-                onClick={onQuit}
-                className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase mt-1"
+                onClick={toggleFullscreen}
+                title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+                className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase"
               >
-                ⌂ Ana Menü
+                {isFullscreen ? '⛶ Küçült' : '⛶ Tam Ekran'}
               </button>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -767,6 +776,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
 export default function GameScreen({ game, actions, onQuit }) {
   const [rulesOpen, setRulesOpen] = useState(false);
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   const activeRows = game.board
     .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))
@@ -783,7 +793,6 @@ export default function GameScreen({ game, actions, onQuit }) {
 
   return (
     <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
-      <AmbientBackground variant="game" density="subtle" className="z-0" />
       <div className="relative z-10 flex flex-1 flex-col lg:flex-row w-full min-h-0 min-w-0">
         <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0">
           <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
