@@ -81,7 +81,7 @@ function FloatingCards() {
   );
 }
 
-export default function LobbyScreen({ onCreateRoom, onJoinRoom, status, error, roomId }) {
+export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, error, roomId }) {
   const [joinCode, setJoinCode] = useState('');
 
   // Oda bekleme ekranı
@@ -89,6 +89,15 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, status, error, r
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
         <FloatingCards />
+
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-5 left-5 font-mono text-xs text-white/50 hover:text-white/90 transition-colors z-10"
+          >
+            ← Geri
+          </button>
+        )}
 
         {/* Arka plan kırmızı ışıma */}
         <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] pointer-events-none z-0"
@@ -135,6 +144,15 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, status, error, r
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
       <FloatingCards />
+
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="absolute top-5 left-5 font-mono text-xs text-white/50 hover:text-white/90 transition-colors z-10"
+        >
+          ← Geri
+        </button>
+      )}
 
       {/* Arka plan ışımalar */}
       <div className="fixed inset-0 pointer-events-none z-0">

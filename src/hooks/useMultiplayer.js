@@ -4,7 +4,6 @@ import { createClassicGame } from '../game/setup.js';
 import { PHASE, TURN } from '../game/constants.js';
 import {
   applyKillerPickIdentity,
-  applyKillerPickDisguise,
   applyKill,
   applyArrest,
   applyExonerate,

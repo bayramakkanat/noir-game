@@ -6,30 +6,28 @@ import SuspectCard from '../components/SuspectCard.jsx';
 
 
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
-function useGridCellSize() {
+function useGridCellSize(numRows, numCols) {
   const [cellSize, setCellSize] = React.useState(72);
 
   React.useEffect(() => {
     function calc() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const panelW = vw >= 1024 ? 288 : 0;
-      const availW = vw - panelW - 16; // kenar boşluklarını minimuma indirdik
+      const panelW = vw >= 1024 ? 320 : 0;
+      const availW = vw - panelW - 16;
       const availH = vh - 16;
       
-      // Yaklaşık gap hesabı
-      const estCell = Math.min(availW / 5, availH / 5);
+      const estCell = Math.min(availW / numCols, availH / numRows);
       const gap = Math.max(3, Math.round(estCell * 0.055));
       
-      const fromW = Math.floor((availW - (4 * gap)) / 5);
-      const fromH = Math.floor((availH - (4 * gap)) / 5);
+      const fromW = Math.floor((availW - ((numCols - 1) * gap)) / numCols);
+      const fromH = Math.floor((availH - ((numRows - 1) * gap)) / numRows);
       const cell = Math.max(60, Math.min(fromW, fromH));
       setCellSize(cell);
     }
 
     calc();
 
-    // Debounce: resize sırasında framer-motion layout animasyonunu tetiklememek için
     let timer;
     function onResize() {
       clearTimeout(timer);
@@ -37,7 +35,7 @@ function useGridCellSize() {
     }
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('resize', onResize); clearTimeout(timer); };
-  }, []);
+  }, [numRows, numCols]);
 
   return cellSize;
 }
@@ -193,7 +191,7 @@ function DualArrow({ dir1, dir2, onClick1, onClick2, highlighted, visible }) {
 }
 
 // ─── Grid + ok sistemi ────────────────────────────────────────────────────────
-function BoardWithArrows({ game, actions, cellSize }) {
+function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
   const { pendingAction, pendingShift, activeSide, lastShift } = game;
   const humanCanAct = activeSide === 'human';
   const shiftMode = pendingAction === 'shift';
@@ -242,16 +240,17 @@ function BoardWithArrows({ game, actions, cellSize }) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(5, ${CELL}px)`,
-            gridTemplateRows: `repeat(5, ${CELL}px)`,
-            width: CELL * 5 + GAP * 4,
-            height: CELL * 5 + GAP * 4,
+            gridTemplateColumns: `repeat(${activeCols.length}, ${CELL}px)`,
+gridTemplateRows: `repeat(${activeRows.length}, ${CELL}px)`,
+width: CELL * activeCols.length + GAP * (activeCols.length - 1),
+height: CELL * activeRows.length + GAP * (activeRows.length - 1),
             gap: GAP,
             position: 'relative',
           }}
         >
-          {game.board.map((row, r) =>
-            row.map((cell, c) => {
+          {activeRows.map((r, ri) =>
+  activeCols.map((c, ci) => {
+    const cell = game.board[r][c];
               const hl = isHlRow(r) || isHlCol(c);
               return (
                 <div
@@ -272,36 +271,36 @@ function BoardWithArrows({ game, actions, cellSize }) {
 
           {/* İÇ OKLAR */}
           <AnimatePresence>
-            {shiftMode && [0,1,2,3,4].map(r => {
+            {shiftMode && activeRows.map((r, ri) => {
               const vis = rowArrowVisible(r);
               const hl  = rowHighlighted(r);
               if (!vis) return null;
               return (
                 <React.Fragment key={`row-arrows-${r}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}} 
-                    style={{ position: 'absolute', left: 4, top: r * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', left: 4, top: ri * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
                     <ArrowBtn dir="left" onClick={() => handleRowArrow(r, 'left')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', right: 4, top: r * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', right: 4, top: ri * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
                     <ArrowBtn dir="right" onClick={() => handleRowArrow(r, 'right')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
               );
             })}
             
-            {shiftMode && [0,1,2,3,4].map(c => {
+            {shiftMode && activeCols.map((c, ci) => {
               const vis = colArrowVisible(c);
               const hl  = colHighlighted(c);
               if (!vis) return null;
               return (
                 <React.Fragment key={`col-arrows-${c}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', top: 4, left: c * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', top: 4, left: ci * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
                     <ArrowBtn dir="up" onClick={() => handleColArrow(c, 'up')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', bottom: 4, left: c * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', bottom: 4, left: ci * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
                     <ArrowBtn dir="down" onClick={() => handleColArrow(c, 'down')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
@@ -382,7 +381,7 @@ function ToastNotification({ logs }) {
 }
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
-function ActionPanel({ game, actions }) {
+function ActionPanel({ game, actions, onQuit }) {
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -403,7 +402,7 @@ function ActionPanel({ game, actions }) {
 
   return (
     <div className="
-      w-full lg:w-72 
+      w-full lg:w-80 
       fixed bottom-0 left-0 right-0 z-40 lg:static 
       max-h-[50vh] lg:max-h-none overflow-y-auto lg:overflow-hidden
       border-t lg:border-t-0 lg:border-l border-noir-border/40 
@@ -415,19 +414,27 @@ function ActionPanel({ game, actions }) {
       <div className="p-5 border-b border-noir-border/30">
         <div className="flex items-start justify-between">
           <div>
-            <div className="font-display text-xl text-noir-text anim-flicker leading-none">NOIR</div>
-            <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mt-1">
+            <div className="font-display text-2xl text-noir-text anim-flicker leading-none">NOIR</div>
+            <div className="font-mono text-[11px] text-[#8080A0] tracking-widest uppercase mt-1">
               {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
             </div>
           </div>
-          <div className="text-right">
-            <div className={`font-mono text-[11px] font-bold ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
+          <div className="text-right flex flex-col items-end gap-1">
+            <div className={`font-mono text-xs font-bold ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
               {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI oynuyor...' : '○ Bekleniyor'}
             </div>
             {(inPlay || isKillerFirstKill) && (
-              <div className="font-mono text-[10px] text-[#8080A0] mt-0.5">
+              <div className="font-mono text-[11px] text-[#8080A0] mt-0.5">
                 {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
               </div>
+            )}
+            {onQuit && (
+              <button
+                onClick={onQuit}
+                className="font-mono text-[10px] text-[#4A4A5E] hover:text-[#888898] transition-colors tracking-widest uppercase mt-1"
+              >
+                ⌂ Ana Menü
+              </button>
             )}
           </div>
         </div>
@@ -436,12 +443,12 @@ function ActionPanel({ game, actions }) {
       {/* Kimliğim */}
       {mySuspect && (
         <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Kimliğim</div>
+          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Kimliğim</div>
           <div className="flex items-center gap-3">
-            <SuspectCard suspect={mySuspect} size={48} showName={false} state="mine" playerRole={humanRole} />
+            <SuspectCard suspect={mySuspect} size={56} showName={false} state="mine" playerRole={humanRole} />
             <div>
               <div className="font-body text-sm text-noir-text font-semibold">{mySuspect.name}</div>
-              <div className="font-mono text-[10px] text-[#8080A0]">{isHumanKiller ? 'Katil kimliği' : 'Gizli kimlik'}</div>
+              <div className="font-mono text-xs text-[#8080A0]">{isHumanKiller ? 'Katil kimliği' : 'Gizli kimlik'}</div>
             </div>
           </div>
         </div>
@@ -450,12 +457,12 @@ function ActionPanel({ game, actions }) {
       {/* Katilin kılık değiştirme kartı */}
       {isHumanKiller && killer.disguiseCardSuspectId != null && (
         <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Kılık Değiştirme Kartım</div>
+          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Kılık Değiştirme Kartım</div>
           <div className="flex items-center gap-3">
-            <SuspectCard suspect={suspect(killer.disguiseCardSuspectId)} size={48} showName={false} state="disguise" playerRole="killer" />
+            <SuspectCard suspect={suspect(killer.disguiseCardSuspectId)} size={56} showName={false} state="disguise" playerRole="killer" />
             <div>
               <div className="font-body text-sm text-noir-text font-semibold">{suspect(killer.disguiseCardSuspectId).name}</div>
-              <div className="font-mono text-[10px] text-purple-400">Kılık değiştirince bu olacaksın</div>
+              <div className="font-mono text-xs text-purple-400">Kılık değiştirince bu olacaksın</div>
             </div>
           </div>
         </div>
@@ -464,7 +471,7 @@ function ActionPanel({ game, actions }) {
       {/* Aksiyonlar */}
       {humanCanAct && (phase === PHASE.KILLER_PICK_IDENTITY || phase === PHASE.KILLER_PICK_DISGUISE) && isHumanKiller && (
         <div className="p-4 border-b border-noir-border/30 bg-yellow-900/10">
-          <div className="font-mono text-[10px] text-yellow-400 tracking-widest uppercase mb-3">
+          <div className="font-mono text-xs text-yellow-400 tracking-widest uppercase mb-3">
             Kimlik Seç
           </div>
           <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş kartlardan hangisi olmak istediğini seç. (Diğeri kılık değiştirme kartın olacak)</p>
@@ -473,7 +480,7 @@ function ActionPanel({ game, actions }) {
 
       {humanCanAct && phase === PHASE.INSPECTOR_PICK_IDENTITY && isHumanInspector && (
         <div className="p-4 border-b border-noir-border/30 bg-blue-900/10">
-          <div className="font-mono text-[10px] text-blue-400 tracking-widest uppercase mb-3">
+          <div className="font-mono text-xs text-blue-400 tracking-widest uppercase mb-3">
             Gizli Kimlik Seç
           </div>
           <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş gizli kimliklerden birini seç. (Komşularını tutuklayacaksın)</p>
@@ -482,7 +489,7 @@ function ActionPanel({ game, actions }) {
 
       {humanCanAct && (inPlay || isKillerFirstKill) && (
         <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-3">
+          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-3">
             {isKillerFirstKill ? 'İlk Hamle — Komşunu Öldür' : 'Hamle Seç'}
           </div>
           <div className="flex flex-col gap-2">
@@ -498,7 +505,7 @@ function ActionPanel({ game, actions }) {
                   }`}
                 >
                   🗡️ {isKillerFirstKill ? 'Hedef Seç' : 'Öldür'}
-                  {pendingAction === 'kill' && <span className="ml-auto text-[9px] opacity-60">tahtaya tıkla</span>}
+                  {pendingAction === 'kill' && <span className="ml-auto text-[10px] opacity-60">tahtaya tıkla</span>}
                 </button>
                 {inPlay && (
                   <button
@@ -523,7 +530,7 @@ function ActionPanel({ game, actions }) {
                   }`}
                 >
                   🔍 Tutuklama
-                  {pendingAction === 'arrest' && <span className="ml-auto text-[9px] opacity-60">tahtaya tıkla</span>}
+                  {pendingAction === 'arrest' && <span className="ml-auto text-[10px] opacity-60">tahtaya tıkla</span>}
                 </button>
                 <button
                   onClick={actions.beginExonerate}
@@ -545,7 +552,7 @@ function ActionPanel({ game, actions }) {
                 }`}
               >
                 ↔ Tahta Kaydır
-                {pendingAction === 'shift' && <span className="ml-auto text-[9px] opacity-60">ok'a tıkla</span>}
+                {pendingAction === 'shift' && <span className="ml-auto text-[10px] opacity-60">ok'a tıkla</span>}
               </button>
             )}
           </div>
@@ -556,22 +563,22 @@ function ActionPanel({ game, actions }) {
       <div className="p-4 border-b border-noir-border/30 grid grid-cols-3 gap-2">
         <div className="text-center">
           <div className="font-mono text-base font-bold text-red-500">{deadCount}</div>
-          <div className="font-mono text-[10px] text-[#8080A0] uppercase">Ölü</div>
+          <div className="font-mono text-xs text-[#8080A0] uppercase">Ölü</div>
         </div>
         <div className="text-center">
           <div className="font-mono text-base font-bold text-green-500">{publicExonerated.length}</div>
-          <div className="font-mono text-[10px] text-[#8080A0] uppercase">Masum</div>
+          <div className="font-mono text-xs text-[#8080A0] uppercase">Masum</div>
         </div>
         <div className="text-center">
           <div className="font-mono text-base font-bold text-[#AAAAAA]">{evidenceDeck.length}</div>
-          <div className="font-mono text-[10px] text-[#8080A0] uppercase">Deste</div>
+          <div className="font-mono text-xs text-[#8080A0] uppercase">Deste</div>
         </div>
       </div>
 
       {/* Dedektif eli */}
       {isHumanInspector && inspector.hand.length > 0 && (
         <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Elimdeki Kartlar</div>
+          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Elimdeki Kartlar</div>
           <div className="flex flex-wrap gap-1.5">
             {inspector.hand.map((id) => (
               <SuspectCard key={id} suspect={suspect(id)} size={44} showName={false} playerRole="inspector" />
@@ -583,7 +590,7 @@ function ActionPanel({ game, actions }) {
       {/* Temize çıkarılanlar */}
       {publicExonerated.length > 0 && (
         <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Masum İlan Edilenler</div>
+          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Masum İlan Edilenler</div>
           <div className="flex flex-wrap gap-1">
             {publicExonerated.map((id) => (
               <SuspectCard key={id} suspect={suspect(id)} size={34} showName={false} state="exonerated" />
@@ -599,7 +606,7 @@ function ActionPanel({ game, actions }) {
           {logs.map((log, i) => (
             <div
               key={i}
-              className={`font-mono text-[10px] leading-relaxed pb-1.5 border-b border-noir-border/20 ${i === 0 ? 'text-[#E0DDD4]' : 'text-[#9A9890]'}`}
+              className={`font-mono text-xs leading-relaxed pb-1.5 border-b border-noir-border/20 ${i === 0 ? 'text-[#E0DDD4]' : 'text-[#9A9890]'}`}
               dangerouslySetInnerHTML={{ __html: log }}
             />
           ))}
@@ -610,14 +617,26 @@ function ActionPanel({ game, actions }) {
 }
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
-export default function GameScreen({ game, actions }) {
-  const cellSize = useGridCellSize();
+export default function GameScreen({ game, actions, onQuit }) {
+  const activeRows = game.board
+    .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))
+    .filter(x => !x.isEmpty)
+    .map(x => x.r);
+
+  const activeCols = (() => {
+    const numCols = game.board[0]?.length ?? 5;
+    return Array.from({ length: numCols }, (_, c) => c)
+      .filter(c => game.board.some(row => row[c] !== null));
+  })();
+
+  const cellSize = useGridCellSize(activeRows.length, activeCols.length);
+
   return (
     <div className="h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden">
-      <div className="flex-1 flex items-center justify-center px-4 lg:px-6 pt-4">
-        <BoardWithArrows game={game} actions={actions} cellSize={cellSize} />
+      <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1">
+        <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
       </div>
-      <ActionPanel game={game} actions={actions} />
+      <ActionPanel game={game} actions={actions} onQuit={onQuit} />
       <IdentityPicker game={game} actions={actions} />
       <ExonerateOverlay game={game} actions={actions} />
       <ToastNotification logs={game.logs} />

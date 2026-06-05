@@ -9,7 +9,6 @@ import {
   applyDisguise,
   applyShift,
   applyInspectorPickIdentity,
-  applyKillerPickDisguise,
 } from './actions.js';
 
 function pickRandom(arr) {
@@ -97,10 +96,10 @@ export function runAiTurn(game) {
   }
   
   if (game.phase === PHASE.KILLER_PICK_DISGUISE) {
-    const card = pickRandom(game.killer.hand);
-    if (!card) return game;
-    return applyKillerPickDisguise(game, card).game;
-  }
+  const card = pickRandom(game.killer.hand);
+  if (!card) return game;
+  return applyDisguise(game, { ...game.killer, disguiseCardSuspectId: card }, game.inspector.secretIdentitySuspectId).game;
+}
 
   if (game.phase === PHASE.KILLER_FIRST_KILL) {
     const targets = getKillTargets(game, game.killer.identitySuspectId);

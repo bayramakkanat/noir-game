@@ -49,6 +49,7 @@ export function createClassicGame(humanRole) {
     publicExonerated: [],
 
     lastShift: null,
+    rowColRemovalUsed: false,
     pendingAction: null,
     pendingShift: null,
     pendingExonerateDiscard: null,

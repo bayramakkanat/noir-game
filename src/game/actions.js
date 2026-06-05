@@ -114,17 +114,21 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
   })();
 
   // Boş satır/sütun kontrolü
+  // Boş satır/sütun kontrolü — oyun başına sadece 1 kez
+let boardFinal = boardAfterMark;
+let next = { ...game, board: boardFinal, pendingAction: null };
+next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
+
+if (!game.rowColRemovalUsed) {
   const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardAfterMark);
-
-  let next = { ...game, board: cleaned, pendingAction: null };
-  next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
-
   if (removedRows.length > 0 || removedCols.length > 0) {
+    next = { ...next, board: cleaned, rowColRemovalUsed: true };
     const parts = [];
     if (removedRows.length) parts.push(`${removedRows.length} satır`);
     if (removedCols.length) parts.push(`${removedCols.length} sütun`);
     next = addLog(next, `🧹 Tüm karakterler öldü — ${parts.join(' ve ')} tahtadan kaldırıldı.`);
   }
+}
 
   next = applyWinChecks(next, killerIdentityId, inspectorSecretId);
   if (next.gameOver) return { ok: true, game: next };
@@ -176,10 +180,40 @@ export function applyExonerate(game, discardFromHandId) {
 export function applyDisguise(game, killerState, inspectorSecretId) {
   if (game.evidenceDeck.length === 0) return { ok: false, game };
 
-  const { drawn, remaining } = drawCards(game.evidenceDeck, 1);
-  const newCardId = drawn[0];
-  const oldIdentityId = killerState.identitySuspectId;
-  const nextDeck = [...remaining, oldIdentityId];
+  // Ölü karakterlerin id'lerini bul
+const deceasedIds = game.board.flat()
+  .filter(c => c && c.status === CELL_STATUS.DECEASED)
+  .map(c => c.suspectId);
+
+// Desteden ölü olmayan bir kart çek
+let drawn, remaining;
+let attempts = 0;
+let newCardId = null;
+let tempDeck = [...game.evidenceDeck];
+
+while (attempts < tempDeck.length) {
+  const result = drawCards(tempDeck, 1);
+  if (!deceasedIds.includes(result.drawn[0])) {
+    drawn = result.drawn;
+    remaining = result.remaining;
+    newCardId = drawn[0];
+    break;
+  }
+  // Ölü kart çıktı, desteye geri at ve tekrar dene
+  tempDeck = [...result.remaining, result.drawn[0]];
+  attempts++;
+}
+
+// Tüm destede ölü olmayan kart yoksa ilk çekilen ile devam et
+if (newCardId === null) {
+  const result = drawCards(game.evidenceDeck, 1);
+  drawn = result.drawn;
+  remaining = result.remaining;
+  newCardId = drawn[0];
+}
+
+const oldIdentityId = killerState.identitySuspectId;
+const nextDeck = [...remaining, oldIdentityId];
   const nextKiller = { ...killerState, identitySuspectId: newCardId };
 
   let next = { ...game, evidenceDeck: nextDeck, killer: nextKiller, pendingAction: null };

@@ -50,8 +50,23 @@ export function isAlive(cell) {
 export function getNeighborCoords(board, r, c) {
   const out = [];
   for (const [dr, dc] of NEIGHBOR_OFFSETS) {
-    const nr = r + dr;
-    const nc = c + dc;
+    let nr = r + dr;
+    let nc = c + dc;
+
+    // Null satırları atla
+    if (dr !== 0) {
+      while (nr >= 0 && nr < board.length && board[nr].every(cell => cell === null)) {
+        nr += dr > 0 ? 1 : -1;
+      }
+    }
+
+    // Null sütunları atla
+    if (dc !== 0) {
+      while (nc >= 0 && nc < (board[0]?.length ?? 0) && board.every(row => row[nc] === null)) {
+        nc += dc > 0 ? 1 : -1;
+      }
+    }
+
     if (isInBounds(board, nr, nc)) out.push({ r: nr, c: nc });
   }
   return out;

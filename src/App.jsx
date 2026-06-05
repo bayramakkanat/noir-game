@@ -151,6 +151,7 @@ export default function App() {
         {soloScreen === 'game' && (
           <GameScreen
             game={solo.game}
+            onQuit={() => { solo.resetGame(); setMode('menu'); }}
             actions={{
               setPending: solo.setPending,
               cancelPending: solo.cancelPending,

@@ -3,7 +3,6 @@ import { createClassicGame } from '../game/setup.js';
 import { PHASE, TURN } from '../game/constants.js';
 import {
   applyKillerPickIdentity,
-  applyKillerPickDisguise,
   applyKill,
   applyArrest,
   applyExonerate,
@@ -70,10 +69,10 @@ export function useGameState() {
     setGame((prev) => {
       if (!prev || prev.activeSide !== 'human') return prev;
       if (prev.phase === PHASE.KILLER_PICK_DISGUISE) {
-        const { ok, game: next } = applyKillerPickDisguise(prev, cardSuspectId);
-        if (ok) playClickSound();
-        return next;
-      }
+  const { ok, game: next } = applyKillerPickIdentity(prev, cardSuspectId);
+  if (ok) playClickSound();
+  return next;
+}
       const { ok, game: next } = applyKillerPickIdentity(prev, cardSuspectId);
       if (ok) playClickSound();
       return next;
