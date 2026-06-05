@@ -189,9 +189,19 @@ function suspect(id) {
 
 // ─── Tahta hücresi ────────────────────────────────────────────────────────────
 function BoardCell({ cell, r, c, game, actions, cellSize }) {
-  const { pendingAction, humanRole, activeSide } = game;
+  const { pendingAction, humanRole, phase, turn } = game;
   const secrets = actions.getActingSecrets(game);
-  const humanCanAct = activeSide === 'human';
+  const humanCanAct = (() => {
+  if (phase === PHASE.KILLER_PICK_IDENTITY && humanRole === 'killer') return true;
+  if (phase === PHASE.KILLER_PICK_DISGUISE && humanRole === 'killer') return true;
+  if (phase === PHASE.INSPECTOR_PICK_IDENTITY && humanRole === 'inspector') return true;
+  if (phase === PHASE.KILLER_FIRST_KILL && humanRole === 'killer') return true;
+  if (phase === PHASE.PLAY) {
+    if (turn === TURN.KILLER && humanRole === 'killer') return true;
+    if (turn === TURN.INSPECTOR && humanRole === 'inspector') return true;
+  }
+  return false;
+})();
 
   if (!cell) return <div style={{ width: 68, height: 68 }} />;
 
@@ -310,8 +320,21 @@ function ArrowBtn({ onClick, dir, highlighted }) {
 
 // ─── Grid + ok sistemi ────────────────────────────────────────────────────────
 function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
-  const { pendingAction, pendingShift, activeSide } = game;
-  const humanCanAct = activeSide === 'human';
+  // 🔥 YENİ SATIR
+  if (!activeRows.length || !activeCols.length) return <div className="text-white/50 p-8">Yükleniyor...</div>;
+  
+  const { pendingAction, pendingShift, phase, turn, humanRole } = game;
+  const humanCanAct = (() => {
+  if (phase === PHASE.KILLER_PICK_IDENTITY && humanRole === 'killer') return true;
+  if (phase === PHASE.KILLER_PICK_DISGUISE && humanRole === 'killer') return true;
+  if (phase === PHASE.INSPECTOR_PICK_IDENTITY && humanRole === 'inspector') return true;
+  if (phase === PHASE.KILLER_FIRST_KILL && humanRole === 'killer') return true;
+  if (phase === PHASE.PLAY) {
+    if (turn === TURN.KILLER && humanRole === 'killer') return true;
+    if (turn === TURN.INSPECTOR && humanRole === 'inspector') return true;
+  }
+  return false;
+})();
   const shiftMode = pendingAction === 'shift';
 
   const selAxis  = pendingShift?.step === 'direction' ? pendingShift.axis  : null;
@@ -525,6 +548,7 @@ function ToastNotification({ logs }) {
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
 function ActionPanel({ game, actions, onQuit, onOpenRules }) {
+  console.log("onQuit değeri:", onQuit);
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -532,7 +556,17 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
   } = game;
 
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
-  const humanCanAct = activeSide === 'human';
+  const humanCanAct = (() => {
+  if (phase === PHASE.KILLER_PICK_IDENTITY && humanRole === 'killer') return true;
+  if (phase === PHASE.KILLER_PICK_DISGUISE && humanRole === 'killer') return true;
+  if (phase === PHASE.INSPECTOR_PICK_IDENTITY && humanRole === 'inspector') return true;
+  if (phase === PHASE.KILLER_FIRST_KILL && humanRole === 'killer') return true;
+  if (phase === PHASE.PLAY) {
+    if (turn === TURN.KILLER && humanRole === 'killer') return true;
+    if (turn === TURN.INSPECTOR && humanRole === 'inspector') return true;
+  }
+  return false;
+})();
   const secrets = actions.getActingSecrets(game);
   const inPlay = phase === PHASE.PLAY;
   const isKillerFirstKill = phase === PHASE.KILLER_FIRST_KILL;
@@ -554,9 +588,11 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
       shadow-[0_-10px_40px_rgba(0,0,0,0.8)] lg:shadow-none
     ">
 
-      {/* Başlık + tur */}
+           {/* Başlık + tur - GÜNCELLENDI */}
       <div className="p-5 border-b border-noir-border/30">
         <div className="flex items-start justify-between gap-2">
+          
+          {/* SOL: SADECE NOIR LOGOSU */}
           <div className="flex items-start gap-2 min-w-0">
             <div className="min-w-0">
               <div className="font-display text-2xl text-noir-text anim-flicker leading-none">NOIR</div>
@@ -564,44 +600,56 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
                 {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
               </div>
             </div>
+          </div>
+
+          {/* SAĞ: [🏠] [?] | Durum Mesajı | Tam Ekran Butonu */}
+          <div className="text-right flex items-center gap-2 flex-shrink-0">
+            
+            {/* ANA MENU (🏠) */}
+            {onQuit && (
+              <button
+  onClick={onQuit}
+  title="Ana Menü"
+  aria-label="Ana Menü"
+  className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all outline-none focus:outline-none"
+>
+  🏠
+</button>
+            )}
+
+            {/* YARDIM (?) */}
             {onOpenRules && (
               <button
                 type="button"
                 onClick={onOpenRules}
                 title="Nasıl oynanır?"
                 aria-label="Nasıl oynanır"
-                className="flex-shrink-0 w-8 h-8 mt-0.5 rounded-full border border-noir-border/50 text-[#707088] hover:text-noir-accent hover:border-noir-accent/45 hover:bg-noir-accent/5 font-mono text-sm leading-none transition-colors"
+                className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 text-[#707088] hover:text-noir-accent hover:border-noir-accent/45 hover:bg-noir-accent/5 font-mono text-sm leading-none transition-colors"
               >
                 ?
               </button>
             )}
-          </div>
-          <div className="text-right flex flex-col items-end gap-1 flex-shrink-0">
-            <div className={`font-mono text-xs font-bold ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
-              {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI oynuyor...' : '○ Bekleniyor'}
-            </div>
-            {(inPlay || isKillerFirstKill) && (
-              <div className="font-mono text-[11px] text-[#8080A0] mt-0.5">
-                {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
+
+            {/* DURUM MESAJI (Bekleniyor / Senin turun) */}
+            <div className="flex flex-col items-end gap-0 ml-1">
+              <div className={`font-mono text-xs font-bold whitespace-nowrap ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
+                {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI oynuyor...' : '○ Bekleniyor'}
               </div>
-            )}
-            <div className="flex items-center gap-1.5 mt-2">
-              {onQuit && (
-                <button
-                  onClick={onQuit}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-[11px] text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
-                >
-                  ⌂ Ana Menü
-                </button>
+              {(inPlay || isKillerFirstKill) && (
+                <div className="font-mono text-[11px] text-[#8080A0] mt-0.5 whitespace-nowrap">
+                  {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
+                </div>
               )}
-              <button
-                onClick={toggleFullscreen}
-                title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-[11px] text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
-              >
-                {isFullscreen ? '⛶ Küçült' : '⛶ Tam Ekran'}
-              </button>
             </div>
+
+            {/* TAM EKRAN BUTONU */}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+              className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
+            >
+              {isFullscreen ? '⛶' : '⛶'}
+            </button>
           </div>
         </div>
       </div>
@@ -652,7 +700,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
           <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş gizli kimliklerden birini seç. (Komşularını tutuklayacaksın)</p>
         </div>
       )}
-
+     
       {humanCanAct && (inPlay || isKillerFirstKill) && (
         <div className="p-4 border-b border-noir-border/30">
           <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-3">
@@ -776,8 +824,20 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
 export default function GameScreen({ game, actions, onQuit }) {
+  // 🔥 BU KONTROLÜ EKLE
+  if (!game || !game.board) {
+    console.log("GameScreen: game henüz gelmedi, bekleniyor...");
+    return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
+  }
+  
   const [rulesOpen, setRulesOpen] = useState(false);
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
+
+  // 🔥 YENİ SATIRLAR BAŞLIYOR
+  if (!game.board || game.board.length === 0) {
+    return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
+  }
+  // 🔥 YENİ SATIRLAR BİTİYOR
 
   const activeRows = game.board
     .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))

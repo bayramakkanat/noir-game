@@ -8,9 +8,8 @@ import AmbientBackground from './components/AmbientBackground.jsx';
 import SetupScreen from './screens/SetupScreen';
 import GameScreen  from './screens/GameScreen';
 import EndScreen   from './screens/EndScreen';
-import LobbyScreen from './screens/LobbyScreen';
 import { useGameState } from './hooks/useGameState';
-import { useMultiplayer } from './hooks/useMultiplayer';
+import { usePeerMultiplayer } from './hooks/usePeerMultiplayer';
 
 function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageScale = 1 }) {
   const styles = {
@@ -100,7 +99,6 @@ function MainMenu({ onSelect }) {
       <div className="absolute bottom-0 left-0 right-0 h-72 bg-gradient-to-t from-[#07070F] to-transparent z-[2] pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#07070F]/60 to-transparent z-[2] pointer-events-none" />
 
-      {/* Tam ekran butonu */}
       <button
         type="button"
         onClick={toggleFullscreen}
@@ -111,7 +109,6 @@ function MainMenu({ onSelect }) {
       </button>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
-
         <div className="text-center mb-10 sm:mb-12 anim-fade-in">
           <div className="font-mono text-[10px] tracking-[0.35em] text-white/35 uppercase mb-3">
             1940 · Dedüksiyon Oyunu
@@ -175,7 +172,7 @@ function MainMenu({ onSelect }) {
           className="mt-6 font-mono text-[9px] text-white/15 tracking-widest uppercase anim-fade-in"
           style={{ animationDelay: '0.35s' }}
         >
-          Vercel · Supabase · React
+          Vercel · React
         </p>
       </div>
     </div>
@@ -184,8 +181,8 @@ function MainMenu({ onSelect }) {
 
 export default function App() {
   const [mode, setMode] = useState('menu');
-  const solo  = useGameState();
-  const multi = useMultiplayer();
+  const solo = useGameState();
+  const multi = usePeerMultiplayer();
 
   if (mode === 'menu') {
     return <div className="grain"><MainMenu onSelect={setMode} /></div>;
@@ -227,21 +224,119 @@ export default function App() {
     );
   }
 
+  // MULTIPLAYER - YENİ PEERJS SİSTEMİ
   if (mode === 'multi') {
-    if (multi.status === 'idle' || multi.status === 'creating' || multi.status === 'waiting' || multi.status === 'joining' || !multi.game) {
+    if (multi.status === 'idle' || multi.status === 'creating' || multi.status === 'waiting' || multi.status === 'joining') {
       return (
-        <div className="grain">
-          <LobbyScreen
-            status={multi.status}
-            error={multi.error}
-            roomId={multi.roomId}
-            onCreateRoom={multi.createRoom}
-            onJoinRoom={multi.joinRoom}
-            onBack={() => { multi.leaveRoom(); setMode('menu'); }}
-          />
+        <div className="grain min-h-screen flex items-center justify-center bg-[#0A0A10]">
+          <div className="bg-[#13131E]/90 border border-[#2A2A3E] rounded-xl p-8 max-w-md w-full">
+            <h2 className="font-display text-2xl text-center text-white mb-6">
+              {multi.status === 'idle' ? 'Çok Oyunculu' : 
+               multi.status === 'creating' || multi.status === 'waiting' ? 'Oda Oluşturuluyor...' : 
+               'Odaya Katılınıyor...'}
+            </h2>
+            
+            {multi.status === 'idle' && (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-mono text-[#888898] mb-2">Oda Oluştur</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="createRoomName"
+                      placeholder="oda adı (ör: fb)"
+                      className="flex-1 px-4 py-2 rounded-lg bg-[#0D0D14] border border-[#2A2A3E] text-white font-mono"
+                      maxLength={20}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById('createRoomName');
+                        if (input.value.trim()) multi.createRoom(input.value.trim());
+                      }}
+                      className="px-4 py-2 rounded-lg bg-red-900/30 border border-red-500/40 text-red-400 hover:bg-red-900/50 transition"
+                    >
+                      Oluştur
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="text-center text-[#4A4A5E] my-2">veya</div>
+                
+                <div>
+                  <label className="block text-sm font-mono text-[#888898] mb-2">Odaya Katıl</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="joinRoomName"
+                      placeholder="oda adı"
+                      className="flex-1 px-4 py-2 rounded-lg bg-[#0D0D14] border border-[#2A2A3E] text-white font-mono"
+                      maxLength={20}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById('joinRoomName');
+                        if (input.value.trim()) multi.joinRoom(input.value.trim());
+                      }}
+                      className="px-4 py-2 rounded-lg bg-blue-900/30 border border-blue-500/40 text-blue-400 hover:bg-blue-900/50 transition"
+                    >
+                      Katıl
+                    </button>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => { multi.leaveRoom(); setMode('menu'); }}
+                  className="mt-6 w-full py-2 rounded-lg border border-white/10 text-white/50 text-sm hover:text-white/80 transition"
+                >
+                  Ana Menü
+                </button>
+              </>
+            )}
+            
+            {(multi.status === 'creating' || multi.status === 'waiting') && (
+              <div className="text-center">
+                <div className="animate-pulse mb-4">
+                  <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-yellow-400 font-mono">Oda kuruluyor...</p>
+                  <p className="text-[#888898] text-sm mt-2">Rakip bekleniyor</p>
+                  {multi.roomId && (
+                    <p className="text-[#666] text-xs mt-4">Oda Adı: <span className="text-yellow-400">{multi.roomId}</span></p>
+                  )}
+                </div>
+                <button
+                  onClick={() => { multi.leaveRoom(); setMode('menu'); }}
+                  className="mt-4 px-6 py-2 rounded-lg border border-white/20 text-white/60 hover:text-white/90 transition"
+                >
+                  İptal
+                </button>
+              </div>
+            )}
+            
+            {multi.status === 'joining' && (
+              <div className="text-center">
+                <div className="animate-pulse mb-4">
+                  <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-blue-400 font-mono">Bağlanılıyor...</p>
+                </div>
+                <button
+                  onClick={() => { multi.leaveRoom(); setMode('menu'); }}
+                  className="mt-4 px-6 py-2 rounded-lg border border-white/20 text-white/60 hover:text-white/90 transition"
+                >
+                  İptal
+                </button>
+              </div>
+            )}
+            
+            {multi.error && (
+              <div className="mt-4 p-3 rounded-lg bg-red-900/20 border border-red-500/30 text-red-400 text-sm text-center">
+                {multi.error}
+              </div>
+            )}
+          </div>
         </div>
       );
     }
+    
     if (multi.game?.gameOver) {
       return (
         <div className="grain">
@@ -249,31 +344,33 @@ export default function App() {
         </div>
       );
     }
-    return (
-      <div className="grain">
-        <GameScreen
-          game={multi.game}
-          actions={{
-            setPending: multi.setPending,
-            cancelPending: multi.cancelPending,
-            beginShift: multi.beginShift,
-            selectShiftLine: multi.selectShiftLine,
-            selectShiftDirection: multi.selectShiftDirection,
-            pickKillerIdentity: multi.pickKillerIdentity,
-            executeBoardAction: multi.executeBoardAction,
-            pickInspectorIdentity: multi.pickInspectorIdentity,
-            beginExonerate: multi.beginExonerate,
-            completeExonerate: multi.completeExonerate,
-            executeDisguise: multi.executeDisguise,
-            runAiTurn: multi.runAiTurn,
-            getActingSecrets: multi.getActingSecrets,
-            isCoordTargetable: multi.isCoordTargetable,
-          }}
-          isMultiplayer={true}
-          myRole={multi.myRole}
-          roomId={multi.roomId}
-        />
-      </div>
-    );
+    
+   return (
+  <div className="grain">
+    <GameScreen
+      game={multi.game}
+      actions={{
+        setPending: multi.setPending,
+        cancelPending: multi.cancelPending,
+        beginShift: multi.beginShift,
+        selectShiftLine: multi.selectShiftLine,
+        selectShiftDirection: multi.selectShiftDirection,
+        pickKillerIdentity: multi.pickKillerIdentity,
+        executeBoardAction: multi.executeBoardAction,
+        pickInspectorIdentity: multi.pickInspectorIdentity,
+        beginExonerate: multi.beginExonerate,
+        completeExonerate: multi.completeExonerate,
+        executeDisguise: multi.executeDisguise,
+        runAiTurn: multi.runAiTurn,
+        getActingSecrets: multi.getActingSecrets,
+        isCoordTargetable: multi.isCoordTargetable,
+      }}
+      onQuit={() => { multi.leaveRoom(); setMode('menu'); }} 
+      isMultiplayer={true}
+      myRole={multi.myRole}
+      roomId={multi.roomId}
+    />
+  </div>
+);
   }
 }
