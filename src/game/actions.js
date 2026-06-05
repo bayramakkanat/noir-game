@@ -160,6 +160,7 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   let next = { ...game, pendingAction: null };
   const name = suspectName(targetSuspectId);
 
+  // Doğrudan game üzerindeki katil kimliğini kullan (artık multiplayer'da da dolu)
   const realKillerId = game.killer.identitySuspectId;
   if (checkInspectorWinByArrest(targetSuspectId, realKillerId)) {
     next = addLog(next, `🔍 Tutuklama başarılı: <b>${name}</b> katildi!`);
@@ -167,8 +168,6 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   }
 
   next = addLog(next, `🔍 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
-
-  // Masum olduğu kanıtlanan karakteri investigated listesine ekle
   next = {
     ...next,
     inspector: {

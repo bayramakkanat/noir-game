@@ -91,12 +91,12 @@ export function usePeerMultiplayer() {
   killedSuspectIds: game.killedSuspectIds,
   killSites: game.killSites,
   killer: {
-    identitySuspectId: game.killer.identitySuspectId,        // 🔥 EKLE
+    identitySuspectId: game.killer.identitySuspectId,        // 🔥 BU SATIRI EKLE
     disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
     hand: game.killer.hand,
   },
   inspector: {
-    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId, // 🔥 EKLE
+    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId, // 🔥 BU SATIRI EKLE
     hand: game.inspector.hand,
   },
 }), []);
