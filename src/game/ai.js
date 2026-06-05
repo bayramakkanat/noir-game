@@ -18,10 +18,16 @@ function pickRandom(arr) {
 
 function allShiftMoves(game) {
   const moves = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < game.board.length; i++) {
+    if (game.board[i].every((cell) => cell === null)) continue;
     for (const d of ['left', 'right']) {
       if (canShift(game, 'row', i, d)) moves.push({ axis: 'row', index: i, direction: d });
     }
+  }
+
+  const numCols = game.board[0]?.length ?? 0;
+  for (let i = 0; i < numCols; i++) {
+    if (game.board.every((row) => row[i] === null)) continue;
     for (const d of ['up', 'down']) {
       if (canShift(game, 'col', i, d)) moves.push({ axis: 'col', index: i, direction: d });
     }
@@ -34,8 +40,8 @@ function getSmartInspectorShift(game) {
   if (!moves.length) return null;
 
   const deceasedCoords = [];
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
+  for (let r = 0; r < game.board.length; r++) {
+    for (let c = 0; c < (game.board[r]?.length ?? 0); c++) {
       if (game.board[r][c]?.status === 'deceased') {
         deceasedCoords.push({ r, c });
       }
@@ -60,8 +66,8 @@ function getSmartInspectorShift(game) {
     // Geçici tahtadaki ölülerin konumunu bulmaya gerek yok çünkü ölüler de kaymış olabilir.
     // O yüzden geçici tahtadaki ölüleri tekrar bulmalıyız.
     let tempDeceasedCount = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
+    for (let r = 0; r < tempBoard.length; r++) {
+      for (let c = 0; c < (tempBoard[r]?.length ?? 0); c++) {
         if (tempBoard[r][c]?.status === 'deceased') {
           // Chebyshev mesafesi (en fazla olan x veya y farkı)
           const dist = Math.max(Math.abs(r - inspPos.r), Math.abs(c - inspPos.c));
@@ -153,7 +159,7 @@ export function runAiTurn(game) {
         if (dr === 0 && dc === 0) continue;
         const nr = t.r + dr;
         const nc = t.c + dc;
-        if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) {
+        if (nr >= 0 && nr < game.board.length && nc >= 0 && nc < (game.board[nr]?.length ?? 0)) {
           if (game.board[nr][nc]?.status === 'deceased') {
             score++;
           }

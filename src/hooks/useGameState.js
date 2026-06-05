@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createClassicGame } from '../game/setup.js';
-import { PHASE, TURN } from '../game/constants.js';
+import { PHASE } from '../game/constants.js';
 import {
   applyKillerPickIdentity,
   applyKill,
@@ -143,12 +143,17 @@ export function useGameState() {
     });
   }, []);
 
+  const aiActiveSide = game?.activeSide;
+  const aiTurn = game?.turn;
+  const aiPhase = game?.phase;
+  const aiGameOver = game?.gameOver;
+
   // ── Otomatik AI turu ──────────────────────────────────────────────────────
   // game.activeSide 'ai' olduğunda kısa bir gecikme sonrası AI'yı otomatik oynat
   useEffect(() => {
-    if (!game) return;
-    if (game.gameOver) return;
-    if (game.activeSide !== 'ai') return;
+    if (!aiActiveSide) return;
+    if (aiGameOver) return;
+    if (aiActiveSide !== 'ai') return;
     // Kimlik seçim fazlarında AI mantığı zaten runAiLogic içinde var, çalıştır
     const timer = setTimeout(() => {
       setGame((prev) => {
@@ -157,7 +162,7 @@ export function useGameState() {
       });
     }, 800); // 800ms bekleme — oyuncu hamleyi görsün
     return () => clearTimeout(timer);
-  }, [game?.activeSide, game?.turn, game?.phase, game?.gameOver]);
+  }, [aiActiveSide, aiTurn, aiPhase, aiGameOver]);
 
   return {
     game,

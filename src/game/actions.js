@@ -1,5 +1,5 @@
 import { CELL_STATUS, PHASE, TURN } from './constants.js';
-import { markDeceased, shiftRow, shiftColumn, positionOf, removeEmptyRowsAndCols, cloneBoard } from './board.js';
+import { shiftRow, shiftColumn, positionOf, removeEmptyRowsAndCols } from './board.js';
 import {
   checkInspectorWinByArrest,
   checkKillerWinByDeaths,
@@ -57,23 +57,6 @@ function applyWinChecks(game, killerIdentityId, inspectorSecretId) {
   return game;
 }
 
-/**
- * Öldürme sonrası boş satır/sütunları temizle ve log ekle.
- */
-function applyCleanup(game, boardBeforeClean) {
-  const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardBeforeClean);
-  let next = { ...game, board: cleaned };
-
-  if (removedRows.length > 0) {
-    next = addLog(next, `🧹 Boş satır temizlendi — ${removedRows.length} satır kaldırıldı.`);
-  }
-  if (removedCols.length > 0) {
-    next = addLog(next, `🧹 Boş sütun temizlendi — ${removedCols.length} sütun kaldırıldı.`);
-  }
-
-  return next;
-}
-
 // ─── Katil kimlik seçimi ──────────────────────────────────────────────────────
 export function applyKillerPickIdentity(game, cardSuspectId) {
   if (game.phase !== PHASE.KILLER_PICK_IDENTITY) return { ok: false, game };
@@ -114,20 +97,16 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
   })();
 
   // Boş satır/sütun kontrolü
-  // Boş satır/sütun kontrolü — oyun başına sadece 1 kez
-let boardFinal = boardAfterMark;
-let next = { ...game, board: boardFinal, pendingAction: null };
+let next = { ...game, board: boardAfterMark, pendingAction: null };
 next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
-if (!game.rowColRemovalUsed) {
-  const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardAfterMark);
-  if (removedRows.length > 0 || removedCols.length > 0) {
-    next = { ...next, board: cleaned, rowColRemovalUsed: true };
-    const parts = [];
-    if (removedRows.length) parts.push(`${removedRows.length} satır`);
-    if (removedCols.length) parts.push(`${removedCols.length} sütun`);
-    next = addLog(next, `🧹 Tüm karakterler öldü — ${parts.join(' ve ')} tahtadan kaldırıldı.`);
-  }
+const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardAfterMark);
+if (removedRows.length > 0 || removedCols.length > 0) {
+  next = { ...next, board: cleaned };
+  const parts = [];
+  if (removedRows.length) parts.push(`${removedRows.length} satır`);
+  if (removedCols.length) parts.push(`${removedCols.length} sütun`);
+  next = addLog(next, `🧹 Tüm karakterler öldü — ${parts.join(' ve ')} tahtadan kaldırıldı.`);
 }
 
   next = applyWinChecks(next, killerIdentityId, inspectorSecretId);

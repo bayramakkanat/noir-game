@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUSPECTS } from '../data/suspects.js';
 
@@ -14,7 +14,7 @@ function getCharacterImage(id) {
 }
 
 // Arka planda yüzen tek kart
-function FloatingCard({ suspect, style, delay }) {
+function FloatingCard({ suspect, style, delay, duration, repeatDelay }) {
   const img = getCharacterImage(suspect.id);
   return (
     <motion.div
@@ -27,10 +27,10 @@ function FloatingCard({ suspect, style, delay }) {
         rotate: style.rotate ?? 0,
       }}
       transition={{
-        duration: 8 + Math.random() * 4,
+        duration,
         delay,
         repeat: Infinity,
-        repeatDelay: Math.random() * 6,
+        repeatDelay,
         ease: 'easeInOut',
       }}
     >
@@ -75,6 +75,8 @@ function FloatingCards() {
           suspect={SUSPECTS[i % SUSPECTS.length]}
           style={pos}
           delay={i * 0.4}
+          duration={8 + (i % 5) * 0.8}
+          repeatDelay={(i % 4) * 1.2}
         />
       ))}
     </div>

@@ -124,14 +124,29 @@ export function countAlive(board) {
   return n;
 }
 
-/** Satırdaki tüm hücreler deceased mi? (null hücreler yok sayılır) */
-function isRowAllDeceased(row) {
-  return row.every(cell => cell === null || cell.status === CELL_STATUS.DECEASED);
+function getActiveRowIndices(board) {
+  return board
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.some((cell) => cell !== null))
+    .map(({ index }) => index);
 }
 
-/** Sütundaki tüm hücreler deceased mi? */
+function getActiveColIndices(board) {
+  const numCols = board[0]?.length ?? 0;
+  return Array.from({ length: numCols }, (_, index) => index)
+    .filter((index) => board.some((row) => row[index] !== null));
+}
+
+/** Satırdaki tüm mevcut hücreler deceased mi? (tamamen null satırlar yok sayılır) */
+function isRowAllDeceased(row) {
+  return row.some((cell) => cell !== null) &&
+    row.every((cell) => cell === null || cell.status === CELL_STATUS.DECEASED);
+}
+
+/** Sütundaki tüm mevcut hücreler deceased mi? (tamamen null sütunlar yok sayılır) */
 function isColAllDeceased(board, colIndex) {
-  return board.every(row => {
+  return board.some((row) => row[colIndex] !== null) &&
+    board.every(row => {
     const cell = row[colIndex];
     return cell === null || cell.status === CELL_STATUS.DECEASED;
   });
@@ -209,41 +224,45 @@ export function markDeceased(board, suspectId) {
   const cell = next[pos.r][pos.c];
   if (cell) cell.status = CELL_STATUS.DECEASED;
   return next;
-  // NOT: removeEmptyRowsAndCols artık actions.js'de manuel çağrılır
-  // (1 kez sınırı için rowColRemovalUsed flag'i kontrol edilmeli)
 }
 
 export function shiftRow(board, rowIndex, direction) {
   const next = cloneBoard(board);
   const row = next[rowIndex];
-  const len = row.length;
+  const activeCols = getActiveColIndices(next);
+  const len = activeCols.length;
+  if (len <= 1) return next;
+
   if (direction === 'right') {
-    const last = row[len - 1];
-    for (let c = len - 1; c > 0; c--) row[c] = row[c - 1];
-    row[0] = last;
+    const last = row[activeCols[len - 1]];
+    for (let i = len - 1; i > 0; i--) row[activeCols[i]] = row[activeCols[i - 1]];
+    row[activeCols[0]] = last;
   } else {
-    const first = row[0];
-    for (let c = 0; c < len - 1; c++) row[c] = row[c + 1];
-    row[len - 1] = first;
+    const first = row[activeCols[0]];
+    for (let i = 0; i < len - 1; i++) row[activeCols[i]] = row[activeCols[i + 1]];
+    row[activeCols[len - 1]] = first;
   }
   return next;
 }
 
 export function shiftColumn(board, colIndex, direction) {
   const next = cloneBoard(board);
-  const len = next.length;
+  const activeRows = getActiveRowIndices(next);
+  const len = activeRows.length;
+  if (len <= 1) return next;
+
   if (direction === 'down') {
-    const last = next[len - 1][colIndex];
-    for (let r = len - 1; r > 0; r--) {
-      next[r][colIndex] = next[r - 1][colIndex];
+    const last = next[activeRows[len - 1]][colIndex];
+    for (let i = len - 1; i > 0; i--) {
+      next[activeRows[i]][colIndex] = next[activeRows[i - 1]][colIndex];
     }
-    next[0][colIndex] = last;
+    next[activeRows[0]][colIndex] = last;
   } else {
-    const first = next[0][colIndex];
-    for (let r = 0; r < len - 1; r++) {
-      next[r][colIndex] = next[r + 1][colIndex];
+    const first = next[activeRows[0]][colIndex];
+    for (let i = 0; i < len - 1; i++) {
+      next[activeRows[i]][colIndex] = next[activeRows[i + 1]][colIndex];
     }
-    next[len - 1][colIndex] = first;
+    next[activeRows[len - 1]][colIndex] = first;
   }
   return next;
 }

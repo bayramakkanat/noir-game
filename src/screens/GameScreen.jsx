@@ -4,6 +4,19 @@ import { PHASE, TURN, CELL_STATUS } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
 
+const BOARD_LAYOUT_TRANSITION = {
+  type: 'spring',
+  stiffness: 24,
+  damping: 18,
+  mass: 1.35,
+};
+
+const CARD_LAYOUT_TRANSITION = {
+  type: 'spring',
+  stiffness: 26,
+  damping: 18,
+  mass: 1.35,
+};
 
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
 function useGridCellSize(numRows, numCols) {
@@ -114,10 +127,9 @@ function BoardCell({ cell, r, c, game, actions, cellSize }) {
       animate={{ scale: (isTargetable || isPickable) ? 1.05 : 1 }}
       transition={{
         layout: {
-          type: 'spring',
-          stiffness: isWrapAround ? 32 : 38,
-          damping:   isWrapAround ? 12 : 14,
-          mass:      1,
+          ...CARD_LAYOUT_TRANSITION,
+          stiffness: isWrapAround ? 20 : CARD_LAYOUT_TRANSITION.stiffness,
+          damping: isWrapAround ? 16 : CARD_LAYOUT_TRANSITION.damping,
         },
         scale: { type: 'spring', stiffness: 300, damping: 20 }
       }}
@@ -171,28 +183,9 @@ function ArrowBtn({ onClick, dir, highlighted }) {
   );
 }
 
-// ─── Çift yönlü ok grubu ──────────────────────────────────────────────────────
-function DualArrow({ dir1, dir2, onClick1, onClick2, highlighted, visible }) {
-  if (!visible) return null;
-  return (
-    <AnimatePresence>
-      <motion.div
-        key="dual"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-      >
-        <ArrowBtn dir={dir1} onClick={onClick1} highlighted={highlighted} />
-        <ArrowBtn dir={dir2} onClick={onClick2} highlighted={highlighted} />
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
 // ─── Grid + ok sistemi ────────────────────────────────────────────────────────
 function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
-  const { pendingAction, pendingShift, activeSide, lastShift } = game;
+  const { pendingAction, pendingShift, activeSide } = game;
   const humanCanAct = activeSide === 'human';
   const shiftMode = pendingAction === 'shift';
 
@@ -237,24 +230,36 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
     <LayoutGroup>
       <div className="flex flex-col items-center">
         {/* GRID */}
-        <div
+        <motion.div
+          layout
+          transition={{ layout: BOARD_LAYOUT_TRANSITION }}
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${activeCols.length}, ${CELL}px)`,
-gridTemplateRows: `repeat(${activeRows.length}, ${CELL}px)`,
-width: CELL * activeCols.length + GAP * (activeCols.length - 1),
-height: CELL * activeRows.length + GAP * (activeRows.length - 1),
+            gridTemplateRows: `repeat(${activeRows.length}, ${CELL}px)`,
+            width: CELL * activeCols.length + GAP * (activeCols.length - 1),
+            height: CELL * activeRows.length + GAP * (activeRows.length - 1),
             gap: GAP,
             position: 'relative',
           }}
         >
-          {activeRows.map((r, ri) =>
-  activeCols.map((c, ci) => {
-    const cell = game.board[r][c];
+          <AnimatePresence mode="popLayout">
+            {activeRows.map((r) =>
+              activeCols.map((c) => {
+                const cell = game.board[r][c];
               const hl = isHlRow(r) || isHlCol(c);
               return (
-                <div
+                <motion.div
                   key={`slot-${r}-${c}`}
+                  layout
+                  initial={false}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.92 }}
+                  transition={{
+                    layout: BOARD_LAYOUT_TRANSITION,
+                    opacity: { duration: 0.45, ease: 'easeOut' },
+                    scale: { duration: 0.45, ease: 'easeOut' },
+                  }}
                   style={{
                     borderRadius: 10,
                     outline: hl ? '3px solid rgba(250,204,21,0.6)' : 'none',
@@ -264,10 +269,11 @@ height: CELL * activeRows.length + GAP * (activeRows.length - 1),
                   }}
                 >
                   <BoardCell cell={cell} r={r} c={c} game={game} actions={actions} cellSize={CELL} />
-                </div>
+                </motion.div>
               );
             })
           )}
+          </AnimatePresence>
 
           {/* İÇ OKLAR */}
           <AnimatePresence>
@@ -307,7 +313,7 @@ height: CELL * activeRows.length + GAP * (activeRows.length - 1),
               );
             })}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
       {shiftMode && (
         <div className="text-center mt-2">
@@ -322,11 +328,6 @@ height: CELL * activeRows.length + GAP * (activeRows.length - 1),
     </div>
     </LayoutGroup>
   );
-}
-
-// ─── Kimlik seçim overlay ─────────────────────────────────────────────────────
-function IdentityPicker({ game, actions }) {
-  return null;
 }
 
 // ─── Exonerate overlay ────────────────────────────────────────────────────────
@@ -354,15 +355,15 @@ function ExonerateOverlay({ game, actions }) {
 
 // ─── Toast Bildirimleri ───────────────────────────────────────────────────────
 function ToastNotification({ logs }) {
-  const [toast, setToast] = React.useState(null);
+  const [hiddenLog, setHiddenLog] = React.useState(null);
+  const latestLog = logs[0] ?? null;
+  const toast = latestLog && latestLog !== hiddenLog ? latestLog : null;
 
   React.useEffect(() => {
-    if (logs.length > 0) {
-      setToast(logs[0]);
-      const timer = setTimeout(() => setToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [logs]);
+    if (!latestLog) return;
+    const timer = setTimeout(() => setHiddenLog(latestLog), 4000);
+    return () => clearTimeout(timer);
+  }, [latestLog]);
 
   return (
     <AnimatePresence>
@@ -637,7 +638,6 @@ export default function GameScreen({ game, actions, onQuit }) {
         <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
       </div>
       <ActionPanel game={game} actions={actions} onQuit={onQuit} />
-      <IdentityPicker game={game} actions={actions} />
       <ExonerateOverlay game={game} actions={actions} />
       <ToastNotification logs={game.logs} />
     </div>

@@ -1,7 +1,6 @@
 import { GAME_MODE, PHASE, TURN, KILLER_SETUP_CARDS, INSPECTOR_HAND_SIZE } from './constants.js';
 import { buildAlphabeticalLayout, createBoardFromLayout } from './board.js';
 import { createEvidenceDeck, shuffle, drawCards } from './deck.js';
-import { SUSPECTS } from '../data/suspects.js';
 
 /**
  * @param {'killer' | 'inspector'} humanRole
@@ -49,7 +48,6 @@ export function createClassicGame(humanRole) {
     publicExonerated: [],
 
     lastShift: null,
-    rowColRemovalUsed: false,
     pendingAction: null,
     pendingShift: null,
     pendingExonerateDiscard: null,

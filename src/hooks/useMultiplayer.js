@@ -307,7 +307,7 @@ export function useMultiplayer() {
   }
 
   // Oda oluştur
-  const createRoom = useCallback(async () => {
+  async function createRoom() {
     if (!userId) return;
     setStatus('creating');
     setError(null);
@@ -337,7 +337,7 @@ export function useMultiplayer() {
 
     // Dedektifin katılmasını polling ile bekle
     pollForInspectorAndStart(id);
-  }, [userId]);
+  }
 
   // Odaya katıl (dedektif)
   const joinRoom = useCallback(async (id) => {
@@ -492,14 +492,12 @@ export function useMultiplayer() {
     });
   }, []);
 
-  const pickKillerIdentity = useCallback((id) => {
+  function pickKillerIdentity(id) {
     applyAndPush(
-      (prev) => prev.phase === PHASE.KILLER_PICK_DISGUISE
-        ? applyKillerPickDisguise(prev, id)
-        : applyKillerPickIdentity(prev, id),
+      (prev) => applyKillerPickIdentity(prev, id),
       playClickSound
     );
-  }, []);
+  }
 
   const executeBoardAction = useCallback((r, c) => {
     setGame((prev) => {
@@ -524,10 +522,19 @@ export function useMultiplayer() {
     });
   }, []);
 
-  const pickInspectorIdentity = useCallback((id) => applyAndPush((prev) => applyInspectorPickIdentity(prev, id), playClickSound), []);
+  function pickInspectorIdentity(id) {
+    applyAndPush((prev) => applyInspectorPickIdentity(prev, id), playClickSound);
+  }
+
   const beginExonerate        = useCallback(() => setGame(g => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g), []);
-  const completeExonerate     = useCallback((id) => applyAndPush((prev) => applyExonerate(prev, id), playClickSound), []);
-  const executeDisguise       = useCallback(() => applyAndPush((prev) => applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId), playDisguiseSound), []);
+
+  function completeExonerate(id) {
+    applyAndPush((prev) => applyExonerate(prev, id), playClickSound);
+  }
+
+  function executeDisguise() {
+    applyAndPush((prev) => applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId), playDisguiseSound);
+  }
 
   const leaveRoom = useCallback(() => {
     // Polling'leri durdur
