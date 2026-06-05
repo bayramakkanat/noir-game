@@ -5,18 +5,146 @@ import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
 
 const BOARD_LAYOUT_TRANSITION = {
-  type: 'spring',
-  stiffness: 24,
-  damping: 18,
-  mass: 1.35,
+  type: 'tween',
+  duration: 2.2,
+  ease: [0.4, 0, 0.2, 1],
 };
 
 const CARD_LAYOUT_TRANSITION = {
-  type: 'spring',
-  stiffness: 26,
-  damping: 18,
-  mass: 1.35,
+  type: 'tween',
+  duration: 2.2,
+  ease: [0.4, 0, 0.2, 1],
 };
+
+// ─── Kaydırma overlay animasyonu ─────────────────────────────────────────────
+function ShiftOverlay({ lastShift, cellSize, activeRows, activeCols }) {
+  const [visible, setVisible] = React.useState(false);
+  const [shift, setShift] = React.useState(null);
+  const prevShift = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!lastShift) return;
+    const key = JSON.stringify(lastShift);
+    if (key === JSON.stringify(prevShift.current)) return;
+    prevShift.current = lastShift;
+    setShift(lastShift);
+    setVisible(true);
+    const t = setTimeout(() => setVisible(false), 3200);
+    return () => clearTimeout(t);
+  }, [lastShift]);
+
+  if (!visible || !shift) return null;
+
+  const GAP = Math.max(3, Math.round(cellSize * 0.055));
+  const isRow = shift.axis === 'row';
+  const rowIdx = activeRows.indexOf(shift.index);
+  const colIdx = activeCols.indexOf(shift.index);
+
+  const dirArrow = { left: '←', right: '→', up: '↑', down: '↓' }[shift.direction];
+  const dirLabel = { left: 'Sola', right: 'Sağa', up: 'Yukarı', down: 'Aşağı' }[shift.direction];
+  const label = `${isRow ? `Satır ${shift.index + 1}` : `Sütun ${shift.index + 1}`} — ${dirLabel}`;
+
+  // Overlay pozisyonu ve boyutu
+  const overlayStyle = isRow ? {
+    top: rowIdx * (cellSize + GAP),
+    left: 0,
+    width: activeCols.length * cellSize + (activeCols.length - 1) * GAP,
+    height: cellSize,
+  } : {
+    top: 0,
+    left: colIdx * (cellSize + GAP),
+    width: cellSize,
+    height: activeRows.length * cellSize + (activeRows.length - 1) * GAP,
+  };
+
+  // Ok hareketi
+  const fromX = isRow ? (shift.direction === 'left' ? 30 : -30) : 0;
+  const fromY = !isRow ? (shift.direction === 'up' ? 30 : -30) : 0;
+  const toX = isRow ? (shift.direction === 'left' ? -30 : 30) : 0;
+  const toY = !isRow ? (shift.direction === 'up' ? -30 : 30) : 0;
+
+  // Sweep hareketi: kaydırma yönünden gelip karşı tarafa geçiyor
+  const sweepFrom = isRow
+    ? { x: shift.direction === 'right' ? '-100%' : '100%', y: 0 }
+    : { x: 0, y: shift.direction === 'down' ? '-100%' : '100%' };
+  const sweepTo = isRow
+    ? { x: shift.direction === 'right' ? '100%' : '-100%', y: 0 }
+    : { x: 0, y: shift.direction === 'down' ? '100%' : '-100%' };
+
+  return (
+    <motion.div
+      key={JSON.stringify(shift)}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 1, 1, 0] }}
+      transition={{ duration: 3.2, times: [0, 0.08, 0.75, 1], ease: 'easeInOut' }}
+      style={{
+        position: 'absolute',
+        ...overlayStyle,
+        borderRadius: 12,
+        background: 'rgba(200, 168, 75, 0.10)',
+        border: '2px solid rgba(200, 168, 75, 0.75)',
+        boxShadow: '0 0 24px rgba(200,168,75,0.25), inset 0 0 20px rgba(200,168,75,0.08)',
+        zIndex: 200,
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: isRow ? 'row' : 'column',
+        gap: 8,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Sweep şeridi — kaydırma yönünde geçiyor */}
+      <motion.div
+        initial={sweepFrom}
+        animate={sweepTo}
+        transition={{ duration: 3.0, ease: [0.25, 0, 0.6, 1] }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: isRow
+            ? `linear-gradient(${shift.direction === 'right' ? 90 : 270}deg, transparent 0%, rgba(200,168,75,0.08) 30%, rgba(200,168,75,0.32) 50%, rgba(200,168,75,0.08) 70%, transparent 100%)`
+            : `linear-gradient(${shift.direction === 'down' ? 180 : 0}deg, transparent 0%, rgba(200,168,75,0.08) 30%, rgba(200,168,75,0.32) 50%, rgba(200,168,75,0.08) 70%, transparent 100%)`,
+        }}
+      />
+
+      {/* Ok ikonu — büyük, net, ortada belirip yavaş söner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={{ opacity: [0, 1, 1, 0], scale: [0.6, 1.1, 1, 1] }}
+        transition={{ duration: 3.0, times: [0, 0.12, 0.3, 1], ease: 'easeInOut' }}
+        style={{
+          display: 'flex',
+          flexDirection: isRow ? 'row' : 'column',
+          alignItems: 'center',
+          gap: 8,
+          zIndex: 10,
+        }}
+      >
+        <span style={{
+          fontSize: cellSize * 0.48,
+          lineHeight: 1,
+          filter: 'drop-shadow(0 0 16px rgba(200,168,75,1)) drop-shadow(0 0 6px rgba(200,168,75,0.8))',
+          color: 'rgba(200,168,75,1)',
+        }}>
+          {dirArrow}
+        </span>
+        <span style={{
+          fontFamily: 'DM Mono, monospace',
+          fontSize: Math.max(11, cellSize * 0.13),
+          color: 'rgba(200,168,75,1)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          textShadow: '0 0 16px rgba(200,168,75,0.9), 0 0 6px rgba(200,168,75,0.6)',
+          writingMode: isRow ? 'horizontal-tb' : 'vertical-rl',
+          fontWeight: '600',
+        }}>
+          {label}
+        </span>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
 function useGridCellSize(numRows, numCols) {
@@ -122,15 +250,10 @@ function BoardCell({ cell, r, c, game, actions, cellSize }) {
   return (
     <motion.div
       layout="position"
-      layoutId={`card-${cell.suspectId}`}
       initial={false}
       animate={{ scale: (isTargetable || isPickable) ? 1.05 : 1 }}
       transition={{
-        layout: {
-          ...CARD_LAYOUT_TRANSITION,
-          stiffness: isWrapAround ? 20 : CARD_LAYOUT_TRANSITION.stiffness,
-          damping: isWrapAround ? 16 : CARD_LAYOUT_TRANSITION.damping,
-        },
+        layout: CARD_LAYOUT_TRANSITION,
         scale: { type: 'spring', stiffness: 300, damping: 20 }
       }}
       style={{ zIndex: isWrapAround ? 50 : (isTargetable || isPickable ? 30 : 1), position: 'relative' }}
@@ -246,19 +369,23 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
           <AnimatePresence mode="popLayout">
             {activeRows.map((r) =>
               activeCols.map((c) => {
+
                 const cell = game.board[r][c];
               const hl = isHlRow(r) || isHlCol(c);
+              // suspectId bazlı key ve layoutId: kaydırmada Framer Motion kartı takip eder
+              const cardKey = cell ? `card-${cell.suspectId}` : `empty-${r}-${c}`;
               return (
                 <motion.div
-                  key={`slot-${r}-${c}`}
+                  key={cardKey}
+                  layoutId={cell ? `card-${cell.suspectId}` : undefined}
                   layout
                   initial={false}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.92 }}
+                  exit={{ opacity: 0, scale: 0.88 }}
                   transition={{
-                    layout: BOARD_LAYOUT_TRANSITION,
-                    opacity: { duration: 0.45, ease: 'easeOut' },
-                    scale: { duration: 0.45, ease: 'easeOut' },
+                    layout: CARD_LAYOUT_TRANSITION,
+                    opacity: { duration: 1.4, ease: 'easeOut' },
+                    scale: { duration: 1.4, ease: 'easeOut' },
                   }}
                   style={{
                     borderRadius: 10,
@@ -274,6 +401,14 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
             })
           )}
           </AnimatePresence>
+
+          {/* KAYDIRMA OVERLAY */}
+          <ShiftOverlay
+            lastShift={game.lastShift}
+            cellSize={CELL}
+            activeRows={activeRows}
+            activeCols={activeCols}
+          />
 
           {/* İÇ OKLAR */}
           <AnimatePresence>
@@ -355,25 +490,28 @@ function ExonerateOverlay({ game, actions }) {
 
 // ─── Toast Bildirimleri ───────────────────────────────────────────────────────
 function ToastNotification({ logs }) {
-  const [hiddenLog, setHiddenLog] = React.useState(null);
+  const [dismissedIndex, setDismissedIndex] = React.useState(-1);
   const latestLog = logs[0] ?? null;
-  const toast = latestLog && latestLog !== hiddenLog ? latestLog : null;
+  const latestIndex = logs.length;
+  const toast = latestLog && latestIndex > dismissedIndex ? latestLog : null;
 
   React.useEffect(() => {
     if (!latestLog) return;
-    const timer = setTimeout(() => setHiddenLog(latestLog), 4000);
+    const timer = setTimeout(() => setDismissedIndex(latestIndex), 5000);
     return () => clearTimeout(timer);
-  }, [latestLog]);
+  }, [latestLog, latestIndex]);
 
   return (
     <AnimatePresence>
       {toast && (
         <motion.div
+          key={latestIndex}
           initial={{ opacity: 0, y: -50, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.9 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-[#1A1A24] text-[#E0DDD4] px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-noir-border/50 text-xs sm:text-sm font-mono max-w-[90vw] text-center"
+          onClick={() => setDismissedIndex(latestIndex)}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-[#1A1A24] text-[#E0DDD4] px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-noir-border/50 text-xs sm:text-sm font-mono max-w-[90vw] text-center cursor-pointer"
           dangerouslySetInnerHTML={{ __html: toast }}
         />
       )}
@@ -588,18 +726,6 @@ function ActionPanel({ game, actions, onQuit }) {
         </div>
       )}
 
-      {/* Temize çıkarılanlar */}
-      {publicExonerated.length > 0 && (
-        <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Masum İlan Edilenler</div>
-          <div className="flex flex-wrap gap-1">
-            {publicExonerated.map((id) => (
-              <SuspectCard key={id} suspect={suspect(id)} size={34} showName={false} state="exonerated" />
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Günlük (Mobilde Gizli) */}
       <div className="hidden lg:flex flex-1 p-4 overflow-hidden flex-col min-h-0">
         <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Olay Günlüğü</div>
@@ -607,7 +733,11 @@ function ActionPanel({ game, actions, onQuit }) {
           {logs.map((log, i) => (
             <div
               key={i}
-              className={`font-mono text-xs leading-relaxed pb-1.5 border-b border-noir-border/20 ${i === 0 ? 'text-[#E0DDD4]' : 'text-[#9A9890]'}`}
+              className={`font-mono text-xs leading-relaxed pb-1.5 border-b border-noir-border/20 ${
+                i === 0
+                  ? 'text-[#E0DDD4] bg-noir-accent/5 px-2 py-1.5 rounded-lg border-noir-accent/20'
+                  : 'text-[#9A9890]'
+              }`}
               dangerouslySetInnerHTML={{ __html: log }}
             />
           ))}

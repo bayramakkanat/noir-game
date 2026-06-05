@@ -59,10 +59,38 @@ function applyWinChecks(game, killerIdentityId, inspectorSecretId) {
 
 // ─── Katil kimlik seçimi ──────────────────────────────────────────────────────
 export function applyKillerPickIdentity(game, cardSuspectId) {
-  if (game.phase !== PHASE.KILLER_PICK_IDENTITY) return { ok: false, game };
+  const validPhase = game.phase === PHASE.KILLER_PICK_IDENTITY || game.phase === PHASE.KILLER_PICK_DISGUISE;
+  if (!validPhase) return { ok: false, game };
   if (!game.killer.hand.includes(cardSuspectId)) return { ok: false, game };
 
   const disguiseCardId = game.killer.hand.find((id) => id !== cardSuspectId);
+
+  // Kılık değiştirme seçimi: eski kimliği desteye geri at, yeni kimlik ve kılık kartını güncelle
+  if (game.phase === PHASE.KILLER_PICK_DISGUISE) {
+    const oldIdentityId = game.killer.identitySuspectId;
+    let next = {
+      ...game,
+      phase: PHASE.PLAY,
+      evidenceDeck: [...game.evidenceDeck, oldIdentityId],
+      killer: {
+        ...game.killer,
+        identitySuspectId: cardSuspectId,
+        disguiseCardSuspectId: disguiseCardId,
+        hand: [],
+      },
+      pendingAction: null,
+    };
+    if (game.humanRole === 'killer') {
+      next = addLog(next, `⇄ Kılık değiştirdin. Yeni kimliğin: <b>${suspectName(cardSuspectId)}</b>.`);
+    } else {
+      next = addLog(next, `⇄ Katil kılık değiştirdi.`);
+    }
+    next = applyWinChecks(next, cardSuspectId, game.inspector.secretIdentitySuspectId);
+    next = advanceTurnAfterAction(next);
+    return { ok: true, game: next };
+  }
+
+  // Oyun başı seçimi
   let next = {
     ...game,
     phase: PHASE.KILLER_FIRST_KILL,
@@ -128,6 +156,14 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   }
 
   next = addLog(next, `🔍 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
+  // Masum olduğu kanıtlanan karakteri investigated listesine ekle — AI bir daha denemez
+  next = {
+    ...next,
+    inspector: {
+      ...next.inspector,
+      investigated: [...(next.inspector.investigated || []), targetSuspectId],
+    },
+  };
   next = advanceTurnAfterAction(next);
   return { ok: true, game: next };
 }
@@ -155,60 +191,54 @@ export function applyExonerate(game, discardFromHandId) {
   return { ok: true, game: next };
 }
 
-// ─── Disguise ─────────────────────────────────────────────────────────────────
+// ─── Disguise: kart çek ve seçim fazını başlat ──────────────────────────────
+// executeDisguise çağırdığında desteden 1 kart çekilir.
+// Elindekiler: [mevcut disguiseCard, yeni kart] → KILLER_PICK_DISGUISE fazına geçilir.
+// Oyuncu hangisini kimlik olarak kullanacağını seçer; diğeri yeni disguiseCard olur.
 export function applyDisguise(game, killerState, inspectorSecretId) {
   if (game.evidenceDeck.length === 0) return { ok: false, game };
 
-  // Ölü karakterlerin id'lerini bul
-const deceasedIds = game.board.flat()
-  .filter(c => c && c.status === CELL_STATUS.DECEASED)
-  .map(c => c.suspectId);
+  // Ölü karakterlerin id'leri — bunları elden geçirmeyeceğiz
+  const deceasedIds = new Set(
+    game.board.flat().filter(c => c?.status === CELL_STATUS.DECEASED).map(c => c.suspectId)
+  );
 
-// Desteden ölü olmayan bir kart çek
-let drawn, remaining;
-let attempts = 0;
-let newCardId = null;
-let tempDeck = [...game.evidenceDeck];
-
-while (attempts < tempDeck.length) {
-  const result = drawCards(tempDeck, 1);
-  if (!deceasedIds.includes(result.drawn[0])) {
-    drawn = result.drawn;
-    remaining = result.remaining;
-    newCardId = drawn[0];
-    break;
+  // Desteden ölü olmayan bir kart çek
+  let newCardId = null;
+  let remaining = [...game.evidenceDeck];
+  for (let i = 0; i < remaining.length; i++) {
+    if (!deceasedIds.has(remaining[i])) {
+      newCardId = remaining[i];
+      remaining = [...remaining.slice(0, i), ...remaining.slice(i + 1)];
+      break;
+    }
   }
-  // Ölü kart çıktı, desteye geri at ve tekrar dene
-  tempDeck = [...result.remaining, result.drawn[0]];
-  attempts++;
-}
 
-// Tüm destede ölü olmayan kart yoksa ilk çekilen ile devam et
-if (newCardId === null) {
-  const result = drawCards(game.evidenceDeck, 1);
-  drawn = result.drawn;
-  remaining = result.remaining;
-  newCardId = drawn[0];
-}
+  // Tüm destede ölü olmayan kart yoksa başarısız
+  if (newCardId === null) return { ok: false, game };
 
-const oldIdentityId = killerState.identitySuspectId;
-const nextDeck = [...remaining, oldIdentityId];
-  const nextKiller = { ...killerState, identitySuspectId: newCardId };
+  // Mevcut disguiseCard + yeni kart → oyuncuya seçim sun
+  const currentDisguise = killerState.disguiseCardSuspectId;
+  const hand = currentDisguise != null ? [currentDisguise, newCardId] : [newCardId];
 
-  let next = { ...game, evidenceDeck: nextDeck, killer: nextKiller, pendingAction: null };
+  let next = {
+    ...game,
+    phase: PHASE.KILLER_PICK_DISGUISE,
+    evidenceDeck: remaining,
+    killer: {
+      ...game.killer,
+      hand,
+    },
+    pendingAction: null,
+    activeSide: game.humanRole === 'killer' ? 'human' : 'ai',
+  };
 
   if (game.humanRole === 'killer') {
-    next = addLog(next, `⇄ Kılık değiştirdin. Yeni kimliğin: <b>${suspectName(newCardId)}</b>.`);
-  } else {
-    next = addLog(next, `⇄ Katil kılık değiştirdi.`);
+    next = addLog(next, `⇄ Kılık değiştirme: elindeki 2 karttan yeni kimliğini seç.`);
   }
 
-  next = applyWinChecks(next, nextKiller.identitySuspectId, inspectorSecretId);
-  if (next.gameOver) return { ok: true, game: next };
-  next = advanceTurnAfterAction(next);
   return { ok: true, game: next };
 }
-
 // ─── Shift ────────────────────────────────────────────────────────────────────
 export function applyShift(game, axis, index, direction) {
   if (isReverseShift(game.lastShift, axis, index, direction)) return { ok: false, game };

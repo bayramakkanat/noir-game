@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import menuBg from './assets/menu-bg.png';
+import tekImg from './assets/tek.png';
+import cokImg from './assets/cok.png';
 import SetupScreen from './screens/SetupScreen';
 import GameScreen  from './screens/GameScreen';
 import EndScreen   from './screens/EndScreen';
@@ -45,81 +47,137 @@ function MainMenu({ onSelect }) {
           </p>
         </div>
 
-        {/* Mod kartları — yatay dikdörtgen */}
+        {/* Mod kartları — dikey, görsel ağırlıklı */}
         <div className="w-full grid grid-cols-2 gap-5 anim-fade-in" style={{ animationDelay: '0.2s' }}>
 
           {/* Tek oyunculu */}
           <button
             onClick={() => onSelect('solo')}
-            className="group relative flex flex-row items-center gap-5 px-8 py-6 rounded-2xl text-left transition-all duration-300 overflow-hidden"
+            className="group relative flex flex-col rounded-2xl text-left transition-all duration-500 overflow-hidden"
             style={{
-              background: 'rgba(18,8,8,0.72)',
-              border: '0.5px solid rgba(192,57,43,0.3)',
-              backdropFilter: 'blur(8px)',
+              background: 'rgba(14,6,6,0.80)',
+              border: '1px solid rgba(192,57,43,0.25)',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.border = '0.5px solid rgba(192,57,43,0.8)';
-              e.currentTarget.style.background = 'rgba(30,8,8,0.85)';
+              e.currentTarget.style.border = '1px solid rgba(192,57,43,0.7)';
+              e.currentTarget.style.boxShadow = '0 0 40px rgba(192,57,43,0.18), 0 8px 40px rgba(0,0,0,0.7)';
+              e.currentTarget.style.transform = 'translateY(-3px)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.border = '0.5px solid rgba(192,57,43,0.3)';
-              e.currentTarget.style.background = 'rgba(18,8,8,0.72)';
+              e.currentTarget.style.border = '1px solid rgba(192,57,43,0.25)';
+              e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.6)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
-              style={{ background: 'rgba(192,57,43,0.15)', border: '0.5px solid rgba(192,57,43,0.35)' }}
-            >
-              🤖
+            {/* Görsel alan */}
+            <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4 / 3' }}>
+              <img
+                src={tekImg}
+                alt="Tek Oyunculu"
+                className="w-full h-full object-cover"
+                style={{ display: 'block', transform: 'scale(1.13)', transformOrigin: 'center center', transition: 'transform 700ms ease' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.18)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1.13)'; }}
+              />
+              {/* Alt gradient geçişi */}
+              <div className="absolute inset-0" style={{
+                background: 'linear-gradient(to bottom, transparent 50%, rgba(14,6,6,0.95) 100%)'
+              }} />
+              {/* Köşe aksan çizgisi */}
+              <div className="absolute top-0 left-0 w-8 h-px" style={{ background: 'rgba(192,57,43,0.6)' }} />
+              <div className="absolute top-0 left-0 w-px h-8" style={{ background: 'rgba(192,57,43,0.6)' }} />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-display text-xl text-white mb-1 group-hover:text-[#E05040] transition-colors">
-                Tek Oyunculu
+
+            {/* Metin alanı */}
+            <div className="flex flex-row items-center gap-3 px-5 py-4">
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-display text-lg text-white mb-0.5 transition-colors duration-300 group-hover:text-[#E05040]"
+                  style={{ letterSpacing: '0.05em' }}
+                >
+                  Tek Oyunculu
+                </div>
+                <div className="font-mono text-[10px] text-white/35 tracking-wider uppercase">
+                  Yapay zekaya karşı oyna
+                </div>
               </div>
-              <div className="font-mono text-[10px] text-white/35 leading-relaxed tracking-wide">
-                Yapay zekaya karşı oyna
+              <div
+                className="w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 transition-all duration-300"
+                style={{ border: '1px solid rgba(192,57,43,0.3)' }}
+              >
+                <span className="text-white/30 group-hover:text-[#E05040] transition-colors text-sm leading-none" style={{ marginLeft: '1px' }}>›</span>
               </div>
             </div>
-            <div className="text-white/20 group-hover:text-[#E05040] transition-colors text-lg">→</div>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-              style={{ background: 'radial-gradient(ellipse at 0% 50%, rgba(192,57,43,0.07) 0%, transparent 70%)' }} />
+
+            {/* Hover glow overlay */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+              style={{ background: 'radial-gradient(ellipse at 50% 80%, rgba(192,57,43,0.06) 0%, transparent 70%)' }} />
           </button>
 
           {/* Çok oyunculu */}
           <button
             onClick={() => onSelect('multi')}
-            className="group relative flex flex-row items-center gap-5 px-8 py-6 rounded-2xl text-left transition-all duration-300 overflow-hidden"
+            className="group relative flex flex-col rounded-2xl text-left transition-all duration-500 overflow-hidden"
             style={{
-              background: 'rgba(8,12,20,0.72)',
-              border: '0.5px solid rgba(41,128,185,0.3)',
-              backdropFilter: 'blur(8px)',
+              background: 'rgba(6,8,16,0.80)',
+              border: '1px solid rgba(41,128,185,0.25)',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.border = '0.5px solid rgba(41,128,185,0.8)';
-              e.currentTarget.style.background = 'rgba(8,14,28,0.85)';
+              e.currentTarget.style.border = '1px solid rgba(41,128,185,0.7)';
+              e.currentTarget.style.boxShadow = '0 0 40px rgba(41,128,185,0.18), 0 8px 40px rgba(0,0,0,0.7)';
+              e.currentTarget.style.transform = 'translateY(-3px)';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.border = '0.5px solid rgba(41,128,185,0.3)';
-              e.currentTarget.style.background = 'rgba(8,12,20,0.72)';
+              e.currentTarget.style.border = '1px solid rgba(41,128,185,0.25)';
+              e.currentTarget.style.boxShadow = '0 8px 40px rgba(0,0,0,0.6)';
+              e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
-              style={{ background: 'rgba(41,128,185,0.15)', border: '0.5px solid rgba(41,128,185,0.35)' }}
-            >
-              👥
+            {/* Görsel alan */}
+            <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4 / 3' }}>
+              <img
+                src={cokImg}
+                alt="Çok Oyunculu"
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                style={{ display: 'block' }}
+              />
+              {/* Alt gradient geçişi */}
+              <div className="absolute inset-0" style={{
+                background: 'linear-gradient(to bottom, transparent 50%, rgba(6,8,16,0.95) 100%)'
+              }} />
+              {/* Köşe aksan çizgisi */}
+              <div className="absolute top-0 right-0 w-8 h-px" style={{ background: 'rgba(41,128,185,0.6)' }} />
+              <div className="absolute top-0 right-0 w-px h-8" style={{ background: 'rgba(41,128,185,0.6)' }} />
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-display text-xl text-white mb-1 group-hover:text-[#4090C8] transition-colors">
-                Çok Oyunculu
+
+            {/* Metin alanı */}
+            <div className="flex flex-row items-center gap-3 px-5 py-4">
+              <div className="flex-1 min-w-0">
+                <div
+                  className="font-display text-lg text-white mb-0.5 transition-colors duration-300 group-hover:text-[#4090C8]"
+                  style={{ letterSpacing: '0.05em' }}
+                >
+                  Çok Oyunculu
+                </div>
+                <div className="font-mono text-[10px] text-white/35 tracking-wider uppercase">
+                  Arkadaşınla oyna
+                </div>
               </div>
-              <div className="font-mono text-[10px] text-white/35 leading-relaxed tracking-wide">
-                Arkadaşınla oyna
+              <div
+                className="w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 transition-all duration-300"
+                style={{ border: '1px solid rgba(41,128,185,0.3)' }}
+              >
+                <span className="text-white/30 group-hover:text-[#4090C8] transition-colors text-sm leading-none" style={{ marginLeft: '1px' }}>›</span>
               </div>
             </div>
-            <div className="text-white/20 group-hover:text-[#4090C8] transition-colors text-lg">→</div>
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-              style={{ background: 'radial-gradient(ellipse at 0% 50%, rgba(41,128,185,0.07) 0%, transparent 70%)' }} />
+
+            {/* Hover glow overlay */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-2xl"
+              style={{ background: 'radial-gradient(ellipse at 50% 80%, rgba(41,128,185,0.06) 0%, transparent 70%)' }} />
           </button>
         </div>
 
