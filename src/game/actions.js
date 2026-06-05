@@ -51,8 +51,8 @@ function advanceTurnAfterAction(game) {
 }
 
 function applyWinChecks(game, killerIdentityId, inspectorSecretId) {
-  if (checkKillerWinByDeaths(game.board)) return endGame(game, 'killer');
-  if (checkKillerWinByKillingInspector(game.board, inspectorSecretId))
+  if (checkKillerWinByDeaths(game.killCount ?? 0)) return endGame(game, 'killer');
+  if (checkKillerWinByKillingInspector(game.board, inspectorSecretId, game.killedSuspectIds))
     return endGame(game, 'killer');
   return game;
 }
@@ -117,6 +117,7 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
   if (!isValidKillTarget(game, killerIdentityId, suspectId)) return { ok: false, game };
 
   // Önce deceased olarak işaretle (cloneBoard üzerinde)
+  const killPos = positionOf(game.board, suspectId);
   const boardAfterMark = (() => {
     const next = game.board.map(row => row.map(cell => cell ? { ...cell } : null));
     const pos = positionOf(next, suspectId);
@@ -124,9 +125,18 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
     return next;
   })();
 
+  const killSite = killPos ? { r: killPos.r, c: killPos.c, suspectId } : null;
+
   // Boş satır/sütun kontrolü
-let next = { ...game, board: boardAfterMark, pendingAction: null };
-next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
+  let next = {
+    ...game,
+    board: boardAfterMark,
+    pendingAction: null,
+    killCount: (game.killCount ?? 0) + 1,
+    killedSuspectIds: [...(game.killedSuspectIds ?? []), suspectId],
+    killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
+  };
+  next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
 const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardAfterMark);
 if (removedRows.length > 0 || removedCols.length > 0) {
@@ -172,6 +182,7 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
 export function applyExonerate(game, discardFromHandId) {
   if (game.evidenceDeck.length === 0) return { ok: false, game };
   if (!game.inspector.hand.includes(discardFromHandId)) return { ok: false, game };
+  if ((game.killedSuspectIds ?? []).includes(discardFromHandId)) return { ok: false, game };
 
   const { drawn, remaining } = drawCards(game.evidenceDeck, 1);
   const drawnId = drawn[0];
@@ -198,10 +209,8 @@ export function applyExonerate(game, discardFromHandId) {
 export function applyDisguise(game, killerState, inspectorSecretId) {
   if (game.evidenceDeck.length === 0) return { ok: false, game };
 
-  // Ölü karakterlerin id'leri — bunları elden geçirmeyeceğiz
-  const deceasedIds = new Set(
-    game.board.flat().filter(c => c?.status === CELL_STATUS.DECEASED).map(c => c.suspectId)
-  );
+  // Ölü karakterlerin id'leri — tahtadan kaldırılmış satır/sütunlar dahil
+  const deceasedIds = new Set(game.killedSuspectIds ?? []);
 
   // Desteden ölü olmayan bir kart çek
   let newCardId = null;

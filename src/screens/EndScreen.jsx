@@ -1,8 +1,6 @@
 import { motion } from 'framer-motion';
 import { SUSPECTS } from '../data/suspects';
 import SuspectCard from '../components/SuspectCard.jsx';
-import { CELL_STATUS } from '../game/constants.js';
-
 // Karakter görsel yükleyici (SuspectCard ile aynı mantık)
 const characterImages = import.meta.glob('../assets/characters/*.png', { eager: true });
 function getCharacterImage(id) {
@@ -88,14 +86,12 @@ export default function EndScreen({ game, onReset }) {
   const killerSuspect  = SUSPECTS[game.killer.identitySuspectId];
   const inspectorSuspect = SUSPECTS[game.inspector.secretIdentitySuspectId];
 
-  // Tahta üzerinde öldürülenler (son 4 tane, fazlası olursa)
-  const deceasedSuspects = game.board
-    .flat()
-    .filter(c => c && c.status === CELL_STATUS.DECEASED)
-    .map(c => SUSPECTS[c.suspectId])
+  // Öldürülenler (son 4 tane, fazlası olursa) — tahtadan kaldırılmış satır/sütunlar dahil
+  const deceasedSuspects = (game.killedSuspectIds ?? [])
+    .map(id => SUSPECTS[id])
     .filter(Boolean)
     .filter(s => s.id !== killerSuspect?.id && s.id !== inspectorSuspect?.id)
-    .slice(0, 4);
+    .slice(-4);
 
   // Tema renkleri
   const accentColor  = killerWon ? '#C0392B' : '#4090C8';

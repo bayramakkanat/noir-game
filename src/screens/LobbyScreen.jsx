@@ -1,87 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SUSPECTS } from '../data/suspects.js';
-
-// Tüm karakter görsellerini yükle
-const characterImages = import.meta.glob('../assets/characters/*.png', { eager: true });
-function getCharacterImage(id) {
-  const key = Object.keys(characterImages).find(k => {
-    const filename = k.split('/').pop();
-    const fileId = parseInt(filename.split('_')[0]);
-    return fileId === id;
-  });
-  return key ? characterImages[key].default : null;
-}
-
-// Arka planda yüzen tek kart
-function FloatingCard({ suspect, style, delay, duration, repeatDelay }) {
-  const img = getCharacterImage(suspect.id);
-  return (
-    <motion.div
-      className="absolute rounded-lg overflow-hidden border border-white/5 shadow-xl select-none pointer-events-none"
-      style={{ width: 72, height: 98, ...style }}
-      initial={{ opacity: 0, y: 30 }}
-      animate={{
-        opacity: [0, 0.18, 0.18, 0],
-        y: [30, 0, -20, -50],
-        rotate: style.rotate ?? 0,
-      }}
-      transition={{
-        duration,
-        delay,
-        repeat: Infinity,
-        repeatDelay,
-        ease: 'easeInOut',
-      }}
-    >
-      {img ? (
-        <img src={img} alt={suspect.name} className="w-full h-full object-cover object-top grayscale" draggable={false} />
-      ) : (
-        <div className="w-full h-full bg-[#13131E]" />
-      )}
-      {/* Alt isim bandı */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pb-1 pt-4 text-center">
-        <div className="font-mono text-[7px] text-white/40 truncate px-1">{suspect.name}</div>
-      </div>
-    </motion.div>
-  );
-}
-
-// Arka plan kartları — 25 karakteri rastgele konumlara yerleştir
-function FloatingCards() {
-  const positions = [
-    { left: '3%',  top: '10%', rotate: -12 },
-    { left: '10%', top: '55%', rotate: 8 },
-    { left: '5%',  top: '78%', rotate: -6 },
-    { left: '18%', top: '25%', rotate: 14 },
-    { left: '22%', top: '70%', rotate: -10 },
-    { left: '72%', top: '8%',  rotate: 9 },
-    { left: '80%', top: '40%', rotate: -14 },
-    { left: '88%', top: '68%', rotate: 7 },
-    { left: '75%', top: '80%', rotate: -8 },
-    { left: '65%', top: '20%', rotate: 11 },
-    { left: '50%', top: '5%',  rotate: -5 },
-    { left: '48%', top: '82%', rotate: 6 },
-    { left: '35%', top: '15%', rotate: -13 },
-    { left: '38%', top: '75%', rotate: 10 },
-    { left: '92%', top: '15%', rotate: -9 },
-  ];
-
-  return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {positions.map((pos, i) => (
-        <FloatingCard
-          key={i}
-          suspect={SUSPECTS[i % SUSPECTS.length]}
-          style={pos}
-          delay={i * 0.4}
-          duration={8 + (i % 5) * 0.8}
-          repeatDelay={(i % 4) * 1.2}
-        />
-      ))}
-    </div>
-  );
-}
+import AmbientBackground from '../components/AmbientBackground.jsx';
 
 export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, error, roomId }) {
   const [joinCode, setJoinCode] = useState('');
@@ -89,8 +8,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
   // Oda bekleme ekranı
   if (status === 'waiting') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden">
-        <FloatingCards />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#0A0A10]">
+        <AmbientBackground variant="lobby" density="full" className="z-0" />
 
         {onBack && (
           <button
@@ -100,10 +19,6 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
             ← Geri
           </button>
         )}
-
-        {/* Arka plan kırmızı ışıma */}
-        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] pointer-events-none z-0"
-          style={{ background: 'radial-gradient(ellipse, #C0392B22 0%, transparent 70%)' }} />
 
         <motion.div
           className="text-center relative z-10"
@@ -144,8 +59,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
 
   // Ana lobi ekranı
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
-      <FloatingCards />
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden bg-[#0A0A10]">
+      <AmbientBackground variant="lobby" density="full" className="z-0" />
 
       {onBack && (
         <button
@@ -155,14 +70,6 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           ← Geri
         </button>
       )}
-
-      {/* Arka plan ışımalar */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px]"
-          style={{ background: 'radial-gradient(ellipse, #C0392B18 0%, transparent 70%)' }} />
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[400px] h-[200px]"
-          style={{ background: 'radial-gradient(ellipse, #4090C810 0%, transparent 70%)' }} />
-      </div>
 
       <motion.div
         className="w-full max-w-sm relative z-10"

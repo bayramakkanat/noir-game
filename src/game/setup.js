@@ -59,6 +59,10 @@ export function createClassicGame(humanRole) {
     ],
     gameOver: false,
     winner: null,
+
+    killCount: 0,
+    killedSuspectIds: [],
+    killSites: [],
   };
 }
 

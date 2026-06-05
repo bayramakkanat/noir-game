@@ -1,6 +1,11 @@
+import { useState } from 'react';
 import menuBg from '../assets/menu-bg.png';
+import AmbientBackground from '../components/AmbientBackground.jsx';
+import HowToPlayModal from '../components/HowToPlayModal.jsx';
 
 export default function SetupScreen({ onStart, onBack }) {
+  const [rulesOpen, setRulesOpen] = useState(false);
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
@@ -11,20 +16,36 @@ export default function SetupScreen({ onStart, onBack }) {
         backgroundRepeat: 'no-repeat',
       }}
     >
-      {/* Karanlık overlay — görselin üstüne okunabilirlik için */}
-      <div className="absolute inset-0 bg-black/60 z-0" />
+      <AmbientBackground variant="setup" density="medium" className="z-[1]" />
+      <div className="absolute inset-0 bg-black/55 z-[2]" />
 
       {/* Alt kısım gradient — butonlar için */}
-      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#0A0A10] to-transparent z-0 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#0A0A10] to-transparent z-[2] pointer-events-none" />
 
-      {onBack && (
+      <div className="absolute top-5 left-5 right-5 flex items-center justify-between z-10">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="font-mono text-xs text-white/50 hover:text-white/90 transition-colors"
+          >
+            ← Geri
+          </button>
+        ) : (
+          <span />
+        )}
         <button
-          onClick={onBack}
-          className="absolute top-5 left-5 font-mono text-xs text-white/50 hover:text-white/90 transition-colors z-10"
+          type="button"
+          onClick={() => setRulesOpen(true)}
+          title="Nasıl oynanır?"
+          aria-label="Nasıl oynanır"
+          className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors"
         >
-          ← Geri
+          ?
         </button>
-      )}
+      </div>
+
+      {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} />}
 
       {/* Başlık */}
       <div className="relative z-10 mb-12 text-center anim-fade-in">

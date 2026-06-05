@@ -38,6 +38,9 @@ function serializePublicState(game) {
     discard_pile: game.discardPile,
     game_over: game.gameOver,
     winner: game.winner,
+    kill_count: game.killCount ?? 0,
+    killed_suspect_ids: game.killedSuspectIds ?? [],
+    kill_sites: game.killSites ?? [],
   };
 }
 
@@ -53,6 +56,9 @@ function deserializePublicState(row, localSecrets) {
     discardPile: row.discard_pile || [],
     gameOver: row.game_over,
     winner: row.winner,
+    killCount: row.kill_count ?? 0,
+    killedSuspectIds: row.killed_suspect_ids ?? [],
+    killSites: row.kill_sites ?? [],
     killer: localSecrets.killer,
     inspector: {
       ...localSecrets.inspector,

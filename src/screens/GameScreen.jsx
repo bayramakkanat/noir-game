@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { PHASE, TURN, CELL_STATUS } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
+import HowToPlayModal from '../components/HowToPlayModal.jsx';
+import AmbientBackground from '../components/AmbientBackground.jsx';
 
 const BOARD_LAYOUT_TRANSITION = {
   type: 'tween',
@@ -475,7 +477,9 @@ function ExonerateOverlay({ game, actions }) {
         <h2 className="font-display text-xl text-noir-text mb-1">Hangi kartı at?</h2>
         <p className="text-xs text-[#7A7A6A] font-mono mb-6">Seçtiğin kart açıklanır; desteden yeni bir kart çekersin.</p>
         <div className="flex flex-wrap gap-4 justify-center">
-          {game.inspector.hand.map((id) => (
+          {game.inspector.hand
+            .filter((id) => !(game.killedSuspectIds ?? []).includes(id))
+            .map((id) => (
             <div key={id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => actions.completeExonerate(id)}>
               <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" />
               <div className="text-[10px] font-mono text-noir-muted group-hover:text-green-400 transition-colors tracking-widest uppercase">At & Temize Çıkar</div>
@@ -520,11 +524,11 @@ function ToastNotification({ logs }) {
 }
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
-function ActionPanel({ game, actions, onQuit }) {
+function ActionPanel({ game, actions, onQuit, onOpenRules }) {
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
-    logs, pendingAction, board,
+    logs, pendingAction, board, killCount,
   } = game;
 
   const humanCanAct = activeSide === 'human';
@@ -535,7 +539,7 @@ function ActionPanel({ game, actions, onQuit }) {
   const isHumanKiller = humanRole === 'killer';
   const isHumanInspector = humanRole === 'inspector';
 
-  const deadCount = board.flat().filter((c) => c?.status === CELL_STATUS.DECEASED).length;
+  const deadCount = killCount ?? board.flat().filter((c) => c?.status === CELL_STATUS.DECEASED).length;
   const myIdentityId = isHumanKiller ? secrets.killerIdentityId : secrets.inspectorSecretId;
   const mySuspect = myIdentityId != null ? suspect(myIdentityId) : null;
 
@@ -551,14 +555,27 @@ function ActionPanel({ game, actions, onQuit }) {
 
       {/* Başlık + tur */}
       <div className="p-5 border-b border-noir-border/30">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="font-display text-2xl text-noir-text anim-flicker leading-none">NOIR</div>
-            <div className="font-mono text-[11px] text-[#8080A0] tracking-widest uppercase mt-1">
-              {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 min-w-0">
+            <div className="min-w-0">
+              <div className="font-display text-2xl text-noir-text anim-flicker leading-none">NOIR</div>
+              <div className="font-mono text-[11px] text-[#8080A0] tracking-widest uppercase mt-1">
+                {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
+              </div>
             </div>
+            {onOpenRules && (
+              <button
+                type="button"
+                onClick={onOpenRules}
+                title="Nasıl oynanır?"
+                aria-label="Nasıl oynanır"
+                className="flex-shrink-0 w-8 h-8 mt-0.5 rounded-full border border-noir-border/50 text-[#707088] hover:text-noir-accent hover:border-noir-accent/45 hover:bg-noir-accent/5 font-mono text-sm leading-none transition-colors"
+              >
+                ?
+              </button>
+            )}
           </div>
-          <div className="text-right flex flex-col items-end gap-1">
+          <div className="text-right flex flex-col items-end gap-1 flex-shrink-0">
             <div className={`font-mono text-xs font-bold ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
               {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI oynuyor...' : '○ Bekleniyor'}
             </div>
@@ -749,6 +766,8 @@ function ActionPanel({ game, actions, onQuit }) {
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
 export default function GameScreen({ game, actions, onQuit }) {
+  const [rulesOpen, setRulesOpen] = useState(false);
+
   const activeRows = game.board
     .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))
     .filter(x => !x.isEmpty)
@@ -763,13 +782,22 @@ export default function GameScreen({ game, actions, onQuit }) {
   const cellSize = useGridCellSize(activeRows.length, activeCols.length);
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden">
-      <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1">
-        <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
+    <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
+      <AmbientBackground variant="game" density="subtle" className="z-0" />
+      <div className="relative z-10 flex flex-1 flex-col lg:flex-row w-full min-h-0 min-w-0">
+        <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0">
+          <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
+        </div>
+        <ActionPanel
+          game={game}
+          actions={actions}
+          onQuit={onQuit}
+          onOpenRules={() => setRulesOpen(true)}
+        />
       </div>
-      <ActionPanel game={game} actions={actions} onQuit={onQuit} />
       <ExonerateOverlay game={game} actions={actions} />
       <ToastNotification logs={game.logs} />
+      {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} />}
     </div>
   );
 }
