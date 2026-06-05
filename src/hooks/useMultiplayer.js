@@ -413,20 +413,21 @@ export function useMultiplayer() {
     };
 
     setRoomId(upper);
-    setMyRole('inspector');
-    setStatus('playing');
+setMyRole('inspector');
 
-    // Güncel oyun state'ini yükle
-    const { data: freshRoom } = await supabase
-      .from('rooms').select('*').eq('id', upper).single();
+const { data: freshRoom } = await supabase
+  .from('rooms').select('*').eq('id', upper).single();
 
-    if (freshRoom) {
-      const loaded = deserializePublicState(freshRoom, localSecretsRef.current);
-      loaded.humanRole  = 'inspector';
-      loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
-      setGame(loaded);
-    }
-    startInspectorPolling(upper);
+if (freshRoom) {
+  const loaded = deserializePublicState(freshRoom, localSecretsRef.current);
+  loaded.humanRole  = 'inspector';
+  loaded.activeSide = calcActiveSide('inspector', freshRoom.phase, freshRoom.turn);
+  setGame(loaded);
+}
+
+// game set edildikten SONRA status'u değiştir
+setStatus('playing');
+startInspectorPolling(upper);
   }, [userId]);
 
   // Supabase'e yaz
