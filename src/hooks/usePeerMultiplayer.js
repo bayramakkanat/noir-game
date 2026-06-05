@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useWakeLock } from './useWakeLock.js';
 import { Peer } from 'peerjs';
 import { createClassicGame } from '../game/setup.js';
 import { getActingSecrets } from '../game/setup.js';
@@ -33,6 +34,10 @@ export function usePeerMultiplayer() {
   const peerRef = useRef(null);
   const connRef = useRef(null);
   const myRoleRef = useRef(null);
+
+  // Multiplayer aktifken ekranın kapanmasını önle
+  const isConnected = status === 'playing';
+  useWakeLock(isConnected);
 
   useEffect(() => {
     myRoleRef.current = myRole;
@@ -96,8 +101,9 @@ export function usePeerMultiplayer() {
     hand: game.killer.hand,
   },
   inspector: {
-    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId, // 🔥 BU SATIRI EKLE
+    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId,
     hand: game.inspector.hand,
+    investigated: game.inspector.investigated || [],
   },
 }), []);
 

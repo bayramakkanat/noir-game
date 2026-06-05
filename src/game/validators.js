@@ -43,7 +43,7 @@ export function getArrestTargets(game, inspectorSecretId) {
     ({ r, c, cell }) => targets.push({ r, c, suspectId: cell.suspectId })
   );
 
-  // Dedektifin kendi kimliği de tutuklanabilir (self-arrest)
+  // Dedektifin kendi kimliği de tutuklanabilir (self-arrest) — katilin kafasını karıştırmak için
   const inspCell = game.board[pos.r][pos.c];
   if (inspCell?.status === CELL_STATUS.ALIVE) {
     targets.push({ r: pos.r, c: pos.c, suspectId: inspectorSecretId });

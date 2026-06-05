@@ -548,7 +548,6 @@ function ToastNotification({ logs }) {
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
 function ActionPanel({ game, actions, onQuit, onOpenRules }) {
-  console.log("onQuit değeri:", onQuit);
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -824,20 +823,11 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
 export default function GameScreen({ game, actions, onQuit }) {
-  // 🔥 BU KONTROLÜ EKLE
   if (!game || !game.board) {
-    console.log("GameScreen: game henüz gelmedi, bekleniyor...");
     return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
   }
   
   const [rulesOpen, setRulesOpen] = useState(false);
-  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
-
-  // 🔥 YENİ SATIRLAR BAŞLIYOR
-  if (!game.board || game.board.length === 0) {
-    return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
-  }
-  // 🔥 YENİ SATIRLAR BİTİYOR
 
   const activeRows = game.board
     .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))
