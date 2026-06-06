@@ -141,30 +141,35 @@ export function usePeerMultiplayer() {
       setStatus('playing');
     } 
     else if (data.type === 'action') {
-      // Rakipten gelen hamleyi uygula
-      const { type, payload, newGameState } = data.data;
-      console.log('Aksiyon geldi:', type, payload);
-      
-      setGame(prev => {
-      if (!prev) return prev;
-      const role = myRoleRef.current;
+      const { type, newGameState } = data.data;
 
-      // Gelen state'i uygula.
-      // Kendi GİZLİ bilgini koru (karşı taraf bunu null göndermiş olabilir).
-      // Ama karşı tarafın kimliği artık serializeGameState içinde geliyor — onu kabul et.
-      const updatedGame = {
-      ...newGameState,
-      killer: {
-        ...newGameState.killer,
-        // Katilsek kendi kimliğimizi biliyoruz, dedektifsek gelen değeri kullan
-      identitySuspectId:
-        role === 'killer'
-            ? prev.killer.identitySuspectId
-            : newGameState.killer.identitySuspectId,
-        },
-        inspector: {
-          ...newGameState.inspector,
-            // Dedektifsek kendi gizli kimliğimizi biliyoruz, katilsek gelen değeri kullan
+      setGame(prev => {
+        if (!prev) return prev;
+        const role = myRoleRef.current;
+
+        // Dedektif için gelen loglarda katile özel mesajları maskele
+        const sanitizedLogs = role === 'inspector'
+          ? newGameState.logs.map(log => {
+              if (log.includes('Gizli kimliğin') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin'))
+                return null;
+              if (log.includes('Elindeki 2 karttan'))
+                return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
+              return log;
+            }).filter(Boolean)
+          : newGameState.logs;
+
+        const updatedGame = {
+          ...newGameState,
+          logs: sanitizedLogs,
+          killer: {
+            ...newGameState.killer,
+            identitySuspectId:
+              role === 'killer'
+                ? prev.killer.identitySuspectId
+                : newGameState.killer.identitySuspectId,
+          },
+          inspector: {
+            ...newGameState.inspector,
             secretIdentitySuspectId:
               role === 'inspector'
                 ? prev.inspector.secretIdentitySuspectId
