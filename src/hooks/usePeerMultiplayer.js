@@ -128,12 +128,15 @@ export function usePeerMultiplayer() {
     console.log('Gelen veri:', data.type);
     
     if (data.type === 'gameState') {
-      // İlk başlangıç state'i
+      const role = myRoleRef.current;
       const newGame = {
         ...data.payload,
-        humanRole: myRoleRef.current,
+        humanRole: role,
+        // Gelen log katilin kendi mesajı; dedektif için override et
+        logs: role === 'inspector'
+          ? ['Oyun başladı. Katil kimliğini seçiyor, bekleniyor...']
+          : data.payload.logs,
       };
-      console.log('Oyun state\'i geldi:', newGame);
       setGame(newGame);
       setStatus('playing');
     } 
