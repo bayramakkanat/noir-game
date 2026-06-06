@@ -33,14 +33,14 @@ function ScreenShell({ children, onBack, showBack = true }) {
         </button>
       )}
 
-      {/* Sağ üst: Tam ekran — köşeli [] stili (GameScreen ile aynı) */}
+      {/* Sağ üst: Tam ekran — SetupScreen ile aynı stil */}
       <button
         type="button"
         onClick={toggleFullscreen}
         title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-        className="absolute top-5 right-5 z-10 flex items-center justify-center w-8 h-8 rounded-lg border border-white/10 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
+        className="absolute top-5 right-5 z-10 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
       >
-        {isFullscreen ? '⧡' : '⬜'}
+        ⛶
       </button>
 
       <div className="relative z-10 w-full flex flex-col items-center">

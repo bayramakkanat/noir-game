@@ -100,14 +100,14 @@ function MainMenu({ onSelect }) {
       <div className="absolute bottom-0 left-0 right-0 h-72 bg-gradient-to-t from-[#07070F] to-transparent z-[2] pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#07070F]/60 to-transparent z-[2] pointer-events-none" />
 
-      {/* Sağ üst: Sadece tam ekran butonu — köşeli [] stili */}
+      {/* Sağ üst: Sadece tam ekran butonu — SetupScreen ile aynı stil */}
       <button
         type="button"
         onClick={toggleFullscreen}
         title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-        className="absolute top-5 right-5 z-10 flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
+        className="absolute top-5 right-5 z-10 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
       >
-        {isFullscreen ? '⧡' : '⬜'}
+        ⛶
       </button>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
