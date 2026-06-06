@@ -124,64 +124,64 @@ export function usePeerMultiplayer() {
   }, [serializeAction]);
 
   // Gelen veriyi işle
-  const handleIncomingData = useCallback((data) => {
-    console.log('Gelen veri:', data.type);
+ const handleIncomingData = useCallback((data) => {
+  console.log('Gelen veri:', data.type);
+  
+  if (data.type === 'gameState') {
+    const role = myRoleRef.current;
+    const newGame = {
+      ...data.payload,
+      humanRole: role,
+      logs: role === 'inspector'
+        ? ['Oyun başladı. Katil kimliğini seçiyor, bekleniyor...']
+        : data.payload.logs,
+    };
+    setGame(newGame);
+    setStatus('playing');
+  } 
+  else if (data.type === 'action') {
+    const { type, payload, newGameState } = data.data;
+    console.log('Aksiyon geldi:', type, payload);
     
-    if (data.type === 'gameState') {
+    setGame(prev => {
+      if (!prev) return prev;
       const role = myRoleRef.current;
-      const newGame = {
-        ...data.payload,
+
+      // Dedektif için gelen loglarda katile özel mesajları maskele
+      const sanitizedLogs = role === 'inspector'
+        ? newGameState.logs.map(log => {
+            if (log.includes('Gizli kimliğin') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin'))
+              return null;
+            if (log.includes('Elindeki 2 karttan'))
+              return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
+            return log;
+          }).filter(Boolean)
+        : newGameState.logs;
+
+      const updatedGame = {
+        ...newGameState,
+        logs: sanitizedLogs,
+        killer: {
+          ...newGameState.killer,
+          identitySuspectId:
+            role === 'killer'
+              ? prev.killer.identitySuspectId
+              : newGameState.killer.identitySuspectId,
+        },
+        inspector: {
+          ...newGameState.inspector,
+          secretIdentitySuspectId:
+            role === 'inspector'
+              ? prev.inspector.secretIdentitySuspectId
+              : newGameState.inspector.secretIdentitySuspectId,
+        },
         humanRole: role,
-        // Gelen log katilin kendi mesajı; dedektif için override et
-        logs: role === 'inspector'
-          ? ['Oyun başladı. Katil kimliğini seçiyor, bekleniyor...']
-          : data.payload.logs,
       };
-      setGame(newGame);
-      setStatus('playing');
-    } 
-    else if (data.type === 'action') {
-      const { type, newGameState } = data.data;
 
-      setGame(prev => {
-        if (!prev) return prev;
-        const role = myRoleRef.current;
-
-        // Dedektif için gelen loglarda katile özel mesajları maskele
-        const sanitizedLogs = role === 'inspector'
-          ? newGameState.logs.map(log => {
-              if (log.includes('Gizli kimliğin') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin'))
-                return null;
-              if (log.includes('Elindeki 2 karttan'))
-                return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
-              return log;
-            }).filter(Boolean)
-          : newGameState.logs;
-
-        const updatedGame = {
-          ...newGameState,
-          logs: sanitizedLogs,
-          killer: {
-            ...newGameState.killer,
-            identitySuspectId:
-              role === 'killer'
-                ? prev.killer.identitySuspectId
-                : newGameState.killer.identitySuspectId,
-          },
-          inspector: {
-            ...newGameState.inspector,
-            secretIdentitySuspectId:
-              role === 'inspector'
-                ? prev.inspector.secretIdentitySuspectId
-                : newGameState.inspector.secretIdentitySuspectId,
-          },
-          humanRole: role,
-        };
-
-        return updatedGame;
-      });
-    }
-  }, []);
+      return updatedGame;
+    });
+  }
+}, []);
 
   // Oda oluştur (Katil)
   const createRoom = useCallback(async (roomName) => {
