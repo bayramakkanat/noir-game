@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { createClassicGame } from '../game/setup.js';
 import { PHASE } from '../game/constants.js';
 import {
-  applyKillerPickIdentity,
   applyKill,
   applyArrest,
   applyExonerate,
@@ -61,20 +60,6 @@ export function useGameState() {
       const { axis, index } = prev.pendingShift;
       const { ok, game: next } = applyShift(prev, axis, index, direction);
       if (ok) playShiftSound();
-      return next;
-    });
-  }, []);
-
-  const pickKillerIdentity = useCallback((cardSuspectId) => {
-    setGame((prev) => {
-      if (!prev || prev.activeSide !== 'human') return prev;
-      if (prev.phase === PHASE.KILLER_PICK_DISGUISE) {
-  const { ok, game: next } = applyKillerPickIdentity(prev, cardSuspectId);
-  if (ok) playClickSound();
-  return next;
-}
-      const { ok, game: next } = applyKillerPickIdentity(prev, cardSuspectId);
-      if (ok) playClickSound();
       return next;
     });
   }, []);
@@ -173,7 +158,6 @@ export function useGameState() {
     beginShift,
     selectShiftLine,
     selectShiftDirection,
-    pickKillerIdentity,
     executeBoardAction,
     pickInspectorIdentity,
     beginExonerate,

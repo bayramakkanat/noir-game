@@ -5,7 +5,6 @@ import { createClassicGame } from '../game/setup.js';
 import { getActingSecrets } from '../game/setup.js';
 import { isCoordTargetable } from '../game/validators.js';
 import {
-  applyKillerPickIdentity,
   applyKill,
   applyArrest,
   applyExonerate,

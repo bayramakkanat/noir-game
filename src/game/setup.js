@@ -1,26 +1,26 @@
-import { GAME_MODE, PHASE, TURN, KILLER_SETUP_CARDS, INSPECTOR_HAND_SIZE } from './constants.js';
+import { GAME_MODE, PHASE, TURN, INSPECTOR_HAND_SIZE } from './constants.js';
 import { buildAlphabeticalLayout, createBoardFromLayout } from './board.js';
 import { createEvidenceDeck, shuffle, drawCards } from './deck.js';
+import { SUSPECTS } from '../data/suspects.js';
 
-/**
- * @param {'killer' | 'inspector'} humanRole
- */
 export function createClassicGame(humanRole) {
   const board = createBoardFromLayout(buildAlphabeticalLayout());
   let deck = shuffle(createEvidenceDeck());
 
-  // Katil 2 kart çeker, birini kimlik olarak seçecek
-  const killerDraw = drawCards(deck, KILLER_SETUP_CARDS);
+  // Katil 1 kart çeker — direkt kimliği olur, seçim fazı yok
+  const killerDraw = drawCards(deck, 1);
   deck = killerDraw.remaining;
+  const killerIdentityId = killerDraw.drawn[0];
+  const killerName = SUSPECTS.find(s => s.id === killerIdentityId)?.name ?? killerIdentityId;
 
   // Dedektif 4 kart çeker, birini kimlik olarak seçecek
   const inspectorDraw = drawCards(deck, INSPECTOR_HAND_SIZE);
   deck = inspectorDraw.remaining;
 
   const killer = {
-    identitySuspectId: null,       // seçim yapılana kadar null
-    hand: killerDraw.drawn,        // 2 kart — seçim ekranında gösterilir
-    disguiseCardSuspectId: null,   // kimlik seçimi sonrası belirlenir
+    identitySuspectId: killerIdentityId,
+    hand: [],
+    disguiseCardSuspectId: null,
   };
 
   const inspector = {
@@ -28,17 +28,13 @@ export function createClassicGame(humanRole) {
     hand: inspectorDraw.drawn,
   };
 
-  // İlk faz: katil kimliğini seçiyor
-  const firstPhase = PHASE.KILLER_PICK_IDENTITY;
-  const firstActiveSide = humanRole === 'killer' ? 'human' : 'ai';
-
   return {
     gameMode: GAME_MODE.CLASSIC,
     board,
-    phase: firstPhase,
+    phase: PHASE.KILLER_FIRST_KILL,
     turn: TURN.KILLER,
     humanRole,
-    activeSide: firstActiveSide,
+    activeSide: humanRole === 'killer' ? 'human' : 'ai',
 
     killer,
     inspector,
@@ -54,8 +50,8 @@ export function createClassicGame(humanRole) {
 
     logs: [
       humanRole === 'killer'
-        ? 'Oyun başladı. Elindeki 2 karttan gizli kimliğini seç.'
-        : 'Oyun başladı. Katil kimliğini seçiyor...',
+        ? `Oyun başladı. Kimliğin: <b>${killerName}</b>. Komşunu öldür.`
+        : 'Oyun başladı. Katil ilk hamlesini yapıyor...',
     ],
     gameOver: false,
     winner: null,

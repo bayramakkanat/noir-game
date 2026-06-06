@@ -2,7 +2,6 @@ import { PHASE, TURN } from './constants.js';
 import { getKillTargets, getArrestTargets, canShift } from './validators.js';
 import { shiftRow, shiftColumn, positionOf } from './board.js';
 import {
-  applyKillerPickIdentity,
   applyKill,
   applyArrest,
   applyExonerate,
@@ -223,21 +222,6 @@ export function runAiTurn(game) {
 
   // Zorluk seviyesini oyun state'inden al; yoksa 'normal' varsayılan
   const cfg = DIFFICULTY[game.difficulty ?? 'normal'];
-
-  // Faz: Katil kimlik seçimi
-  if (game.phase === PHASE.KILLER_PICK_IDENTITY) {
-    const card = pickRandom(game.killer.hand);
-    if (!card) return game;
-    return applyKillerPickIdentity(game, card).game;
-  }
-
-  // Faz: Kılık değiştirme
-  if (game.phase === PHASE.KILLER_PICK_DISGUISE) {
-    // El: [disguiseCard, yeni kart] — AI rastgele birini kimlik olarak seçer
-    const card = pickRandom(game.killer.hand);
-    if (!card) return game;
-    return applyKillerPickIdentity(game, card).game;
-  }
 
   // Faz: İlk öldürme
   if (game.phase === PHASE.KILLER_FIRST_KILL) {

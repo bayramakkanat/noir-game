@@ -667,19 +667,9 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
         </div>
       )}
 
-      {/* Katilin kılık değiştirme kartı */}
-      {isHumanKiller && killer.disguiseCardSuspectId != null && (
-        <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Kılık Değiştirme Kartım</div>
-          <div className="flex items-center gap-3">
-            <SuspectCard suspect={suspect(killer.disguiseCardSuspectId)} size={56} showName={false} state="disguise" playerRole="killer" />
-            <div>
-              <div className="font-body text-sm text-noir-text font-semibold">{suspect(killer.disguiseCardSuspectId).name}</div>
-              <div className="font-mono text-xs text-purple-400">Kılık değiştirince bu olacaksın</div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Katilin yedek kılık kartı — kasıtlı olarak gizlendi.
+         Orijinal oyunda bu kart yüzü kapalı bekler, oyuncu ne olduğunu bilmez.
+         Kılık değiştirince desteden yeni kart gelir, arka planda çalışır. */}
 
       {/* Aksiyonlar */}
       {humanCanAct && (phase === PHASE.KILLER_PICK_IDENTITY || phase === PHASE.KILLER_PICK_DISGUISE) && isHumanKiller && (
@@ -687,7 +677,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
           <div className="font-mono text-xs text-yellow-400 tracking-widest uppercase mb-3">
             Kimlik Seç
           </div>
-          <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş kartlardan hangisi olmak istediğini seç. (Diğeri kılık değiştirme kartın olacak)</p>
+          <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş kartlardan hangisi olmak istediğini seç.</p>
         </div>
       )}
 
