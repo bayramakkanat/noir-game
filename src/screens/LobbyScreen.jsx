@@ -1,142 +1,152 @@
 import { useState } from 'react';
 import { useFullscreen } from '../hooks/useFullscreen.js';
 import { motion, AnimatePresence } from 'framer-motion';
+import menuBg from '../assets/menu-bg.png';
 import AmbientBackground from '../components/AmbientBackground.jsx';
 
-export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, error, roomId }) {
-  const [joinCode, setJoinCode] = useState('');
+// Tüm ekranlar için ortak wrapper
+function ScreenShell({ children, onBack, showBack = true }) {
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
-  // Katılma bekleme ekranı
-  if (status === 'joining') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#0A0A10]">
-        <AmbientBackground variant="lobby" density="full" className="z-0" />
-        <motion.div
-          className="text-center relative z-10"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1 className="font-display text-6xl font-bold text-[#E8E6DC] anim-flicker mb-2">NOIR</h1>
-          <div className="w-16 h-px bg-[#4090C8] mx-auto mb-10" />
-          <div className="flex items-center gap-2 justify-center">
-            <div className="w-2 h-2 rounded-full bg-[#4090C8] anim-pulse" />
-            <p className="font-mono text-xs text-[#888898]">
-              Oyun başlatılıyor...
-            </p>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+  return (
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden"
+      style={{
+        backgroundImage: `url(${menuBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <AmbientBackground variant="lobby" density="full" className="z-[1]" />
+      <div className="absolute inset-0 bg-black/55 z-[2]" />
+      <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-[#0A0A10] to-transparent z-[2] pointer-events-none" />
 
-  // Oda bekleme ekranı
-  if (status === 'waiting') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden bg-[#0A0A10]">
-        <AmbientBackground variant="lobby" density="full" className="z-0" />
-
-        {onBack && (
+      {/* Üst bar */}
+      <div className="absolute top-5 left-5 right-5 flex items-center justify-between z-10">
+        {showBack && onBack ? (
           <button
+            type="button"
             onClick={onBack}
-            className="absolute top-5 left-5 font-mono text-xs text-white/50 hover:text-white/90 transition-colors z-10"
+            className="font-mono text-xs text-white/50 hover:text-white/90 transition-colors"
           >
             ← Geri
           </button>
+        ) : (
+          <span />
         )}
         <button
+          type="button"
           onClick={toggleFullscreen}
           title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-          className="absolute top-5 right-5 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-[#C0392B] hover:border-[#C0392B]/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center z-10"
+          className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-[#C0392B] hover:border-[#C0392B]/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
         >
           {isFullscreen ? '⊡' : '⊞'}
         </button>
+      </div>
 
+      {/* İçerik */}
+      <div className="relative z-10 w-full flex flex-col items-center">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Başlık bloğu
+function NoirTitle({ subtitle }) {
+  return (
+    <div className="text-center mb-10 anim-fade-in">
+      <div className="font-mono text-xs tracking-[0.3em] text-white/40 mb-3 uppercase">
+        {subtitle}
+      </div>
+      <h1
+        className="font-display text-8xl font-bold text-white anim-flicker mb-3 drop-shadow-2xl"
+        style={{ textShadow: '0 0 80px rgba(192,57,43,0.35), 0 2px 20px rgba(0,0,0,0.8)' }}
+      >
+        NOIR
+      </h1>
+      <div className="w-16 h-px bg-[#C0392B] mx-auto" />
+    </div>
+  );
+}
+
+export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, error, roomId }) {
+  const [joinCode, setJoinCode] = useState('');
+  const [createCode, setCreateCode] = useState('');
+
+  // ── Katılma bekleme ekranı ──────────────────────────────────────
+  if (status === 'joining') {
+    return (
+      <ScreenShell onBack={onBack} showBack={false}>
         <motion.div
-          className="text-center relative z-10"
+          className="text-center"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <h1 className="font-display text-6xl font-bold text-[#E8E6DC] anim-flicker mb-2">NOIR</h1>
-          <div className="w-16 h-px bg-[#C0392B] mx-auto mb-10" />
+          <NoirTitle subtitle="Çok Oyunculu" />
+          <div className="flex items-center gap-2 justify-center mt-4">
+            <div className="w-2 h-2 rounded-full bg-[#4090C8] anim-pulse" />
+            <p className="font-mono text-xs text-white/40">Oyun başlatılıyor...</p>
+          </div>
+        </motion.div>
+      </ScreenShell>
+    );
+  }
+
+  // ── Oda bekleme ekranı ─────────────────────────────────────────
+  if (status === 'waiting') {
+    return (
+      <ScreenShell onBack={onBack}>
+        <motion.div
+          className="text-center w-full max-w-sm"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <NoirTitle subtitle="Çok Oyunculu" />
 
           <motion.div
-            className="mb-6 p-6 rounded-2xl bg-[#13131E]/90 border border-[#2A2A3E] backdrop-blur-sm"
+            className="mb-6 p-6 rounded-2xl backdrop-blur-sm text-left"
+            style={{
+              background: 'rgba(26,10,10,0.75)',
+              border: '1px solid rgba(192,57,43,0.4)',
+            }}
             initial={{ scale: 0.95 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <p className="font-mono text-xs text-[#888898] uppercase tracking-widest mb-3">
+            <p className="font-mono text-[10px] text-white/30 uppercase tracking-widest mb-3 text-center">
               Oda Kodu
             </p>
-            <p className="font-display text-5xl font-bold text-[#C0392B] tracking-[0.3em]">
+            <p className="font-display text-5xl font-bold text-[#C0392B] tracking-[0.3em] text-center">
               {roomId}
             </p>
           </motion.div>
 
-          <p className="font-mono text-sm text-[#888898] mb-2">
+          <p className="font-mono text-xs text-white/40 mb-2">
             Bu kodu arkadaşına gönder
           </p>
-          <div className="flex items-center gap-2 justify-center">
+          <div className="flex items-center gap-2 justify-center mt-4">
             <div className="w-2 h-2 rounded-full bg-[#C0392B] anim-pulse" />
-            <p className="font-mono text-xs text-[#888898]">
-              Dedektif bekleniyor...
-            </p>
+            <p className="font-mono text-xs text-white/40">Dedektif bekleniyor...</p>
           </div>
         </motion.div>
-      </div>
+      </ScreenShell>
     );
   }
 
-  // Ana lobi ekranı
+  // ── Ana lobi ekranı ────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden bg-[#0A0A10]">
-      <AmbientBackground variant="lobby" density="full" className="z-0" />
-
-      {onBack && (
-        <button
-          onClick={onBack}
-          className="absolute top-5 left-5 font-mono text-xs text-white/50 hover:text-white/90 transition-colors z-10"
-        >
-          ← Geri
-        </button>
-      )}
-      <button
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-        className="absolute top-5 right-5 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-[#C0392B] hover:border-[#C0392B]/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center z-10"
-      >
-        {isFullscreen ? '⊡' : '⊞'}
-      </button>
-
+    <ScreenShell onBack={onBack}>
       <motion.div
-        className="w-full max-w-sm relative z-10"
+        className="w-full max-w-sm"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Başlık */}
-        <div className="text-center mb-10">
-          <motion.h1
-            className="font-display text-7xl font-bold text-[#E8E6DC] anim-flicker leading-none mb-2"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 80 }}
-          >
-            NOIR
-          </motion.h1>
-          <div className="w-16 h-px bg-[#C0392B] mx-auto mb-3" />
-          <motion.p
-            className="font-mono text-[10px] text-[#888898] tracking-widest uppercase"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            Dedüksiyon Oyunu · 2 Oyuncu
-          </motion.p>
-        </div>
+        <NoirTitle subtitle="Çok Oyunculu" />
 
         {/* Hata */}
         <AnimatePresence>
@@ -145,7 +155,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="mb-4 px-4 py-3 rounded-lg bg-[#1A1012] border border-[#C0392B44] text-[#E05040] font-mono text-xs"
+              className="mb-4 px-4 py-3 rounded-lg font-mono text-xs text-[#E05040]"
+              style={{ background: 'rgba(26,10,10,0.75)', border: '1px solid rgba(192,57,43,0.3)' }}
             >
               {error}
             </motion.div>
@@ -159,21 +170,40 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <button
-            onClick={onCreateRoom}
-            disabled={status === 'creating'}
-            className="w-full flex items-start gap-4 p-5 bg-[#13131E]/90 border border-[#2A2A3E] rounded-xl hover:border-[#C0392B] hover:bg-[#1A1012] transition-all duration-200 group text-left disabled:opacity-50 backdrop-blur-sm"
+          <div
+            className="w-full p-5 rounded-xl border backdrop-blur-sm"
+            style={{ background: 'rgba(26,10,10,0.75)', borderColor: 'rgba(192,57,43,0.4)' }}
           >
-            <div className="text-3xl mt-0.5">🗡️</div>
-            <div>
-              <div className="font-display text-lg text-[#E8E6DC] group-hover:text-[#E05040] transition-colors">
-                Oda Oluştur
-              </div>
-              <div className="font-body text-xs text-[#888898] mt-1 leading-relaxed">
-                Katil olarak oyna. Bir oda kodu oluştur ve arkadaşına gönder.
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-3xl">🗡️</span>
+              <div>
+                <div className="font-display text-lg text-white">Oda Oluştur</div>
+                <div className="font-body text-xs text-white/40 mt-0.5">Katil olarak oyna.</div>
               </div>
             </div>
-          </button>
+            <input
+              type="text"
+              value={createCode}
+              onChange={(e) => setCreateCode(e.target.value)}
+              placeholder="Oda adı gir..."
+              maxLength={20}
+              className="w-full px-4 py-3 rounded-lg font-mono text-sm placeholder:text-white/20 focus:outline-none mb-3 transition-colors"
+              style={{ background: 'rgba(10,10,20,0.8)', border: '1px solid rgba(192,57,43,0.3)', color: '#E8E6DC' }}
+              onFocus={e => e.target.style.borderColor = 'rgba(192,57,43,0.8)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(192,57,43,0.3)'}
+              onKeyDown={e => e.key === 'Enter' && createCode.trim() && onCreateRoom(createCode.trim())}
+            />
+            <button
+              onClick={() => createCode.trim() && onCreateRoom(createCode.trim())}
+              disabled={status === 'creating' || !createCode.trim()}
+              className="w-full py-3 rounded-lg font-mono text-sm tracking-wide transition-all disabled:opacity-40"
+              style={{ background: 'rgba(26,10,10,0.8)', border: '1px solid rgba(192,57,43,0.4)', color: '#E05040' }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.borderColor = 'rgba(192,57,43,0.8)'; }}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(192,57,43,0.4)'}
+            >
+              Oluştur
+            </button>
+          </div>
         </motion.div>
 
         {/* Ayraç */}
@@ -183,14 +213,18 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           animate={{ opacity: 1 }}
           transition={{ delay: 0.45 }}
         >
-          <div className="flex-1 h-px bg-[#2A2A3E]" />
-          <span className="font-mono text-[10px] text-[#4A4A5E] tracking-widest">VEYA</span>
-          <div className="flex-1 h-px bg-[#2A2A3E]" />
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="font-mono text-[10px] text-white/20 tracking-widest">VEYA</span>
+          <div className="flex-1 h-px bg-white/10" />
         </motion.div>
 
         {/* Odaya katıl */}
         <motion.div
-          className="p-5 bg-[#13131E]/90 border border-[#2A2A3E] rounded-xl backdrop-blur-sm"
+          className="p-5 rounded-xl border backdrop-blur-sm"
+          style={{
+            background: 'rgba(10,16,26,0.75)',
+            borderColor: 'rgba(41,128,185,0.4)',
+          }}
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
@@ -198,8 +232,8 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           <div className="flex items-center gap-3 mb-4">
             <span className="text-2xl">🔍</span>
             <div>
-              <div className="font-display text-lg text-[#E8E6DC]">Odaya Katıl</div>
-              <div className="font-body text-xs text-[#888898]">Dedektif olarak oyna.</div>
+              <div className="font-display text-lg text-white">Odaya Katıl</div>
+              <div className="font-body text-xs text-white/40">Dedektif olarak oyna.</div>
             </div>
           </div>
           <input
@@ -207,19 +241,33 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="Oda kodunu gir..."
-            maxLength={6}
-            className="w-full px-4 py-3 rounded-lg bg-[#0D0D14] border border-[#2A2A3E] text-[#E8E6DC] font-mono text-lg tracking-[0.3em] placeholder:text-[#3A3A4E] placeholder:tracking-normal focus:outline-none focus:border-[#4090C8] mb-3 transition-colors"
+            maxLength={20}
+            className="w-full px-4 py-3 rounded-lg font-mono text-lg tracking-[0.2em] placeholder:text-white/20 placeholder:tracking-normal focus:outline-none mb-3 transition-colors"
+            style={{
+              background: 'rgba(10,10,20,0.8)',
+              border: '1px solid rgba(41,128,185,0.3)',
+              color: '#E8E6DC',
+            }}
+            onFocus={e => e.target.style.borderColor = 'rgba(41,128,185,0.8)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(41,128,185,0.3)'}
           />
           <button
             onClick={() => onJoinRoom(joinCode)}
-            className="w-full py-3 rounded-lg border border-[#2980B944] text-[#4090C8] bg-[#101418] hover:border-[#2980B988] hover:bg-[#0D1218] font-mono text-sm tracking-wide transition-all"
+            className="w-full py-3 rounded-lg font-mono text-sm tracking-wide transition-all"
+            style={{
+              background: 'rgba(10,18,30,0.8)',
+              border: '1px solid rgba(41,128,185,0.35)',
+              color: '#4090C8',
+            }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(41,128,185,0.75)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(41,128,185,0.35)'}
           >
             Katıl
           </button>
         </motion.div>
 
         <motion.p
-          className="mt-8 text-center font-mono text-[10px] text-[#3A3A4E]"
+          className="mt-8 text-center font-mono text-[10px] text-white/20"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
@@ -227,6 +275,6 @@ export default function LobbyScreen({ onCreateRoom, onJoinRoom, onBack, status, 
           İki oyuncu farklı cihazlardan oynayabilir
         </motion.p>
       </motion.div>
-    </div>
+    </ScreenShell>
   );
 }
