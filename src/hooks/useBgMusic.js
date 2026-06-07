@@ -10,7 +10,6 @@ export function useBgMusic(play) {
   const fadeRef  = useRef(null);
 
   useEffect(() => {
-    // İlk kullanımda Audio nesnesini oluştur
     if (!audioRef.current) {
       audioRef.current = new Audio(spyMusic);
       audioRef.current.loop   = true;
@@ -19,37 +18,43 @@ export function useBgMusic(play) {
 
     const audio = audioRef.current;
 
-    // Devam eden fade işlemini temizle
     if (fadeRef.current) {
       clearInterval(fadeRef.current);
       fadeRef.current = null;
     }
 
     if (play) {
-      // Müziği başlat ve fade in uygula
-      audio.play().catch(() => {
-        // Tarayıcı autoplay politikası: ilk kullanıcı etkileşiminde tekrar dene
-        const resume = () => {
-          audio.play().catch(() => {});
-          window.removeEventListener('pointerdown', resume);
-        };
-        window.addEventListener('pointerdown', resume);
-      });
+      const startFadeIn = () => {
+        const target = 0.5;
+        const step   = target / 30;
+        if (fadeRef.current) clearInterval(fadeRef.current);
+        fadeRef.current = setInterval(() => {
+          if (audio.volume + step >= target) {
+            audio.volume = target;
+            clearInterval(fadeRef.current);
+            fadeRef.current = null;
+          } else {
+            audio.volume += step;
+          }
+        }, 50);
+      };
 
-      // Fade in: 0 → 0.5 (1.5 saniye)
-      const target = 0.5;
-      const step   = target / 30; // 30 adım
-      fadeRef.current = setInterval(() => {
-        if (audio.volume + step >= target) {
-          audio.volume = target;
-          clearInterval(fadeRef.current);
-          fadeRef.current = null;
-        } else {
-          audio.volume += step;
-        }
-      }, 50);
+      audio.play().then(() => {
+        startFadeIn();
+      }).catch(() => {
+        // Mobil dahil tüm etkileşim eventlerini dinle
+        const EVENTS = ['touchend', 'click', 'keydown', 'pointerdown'];
+
+        const resume = () => {
+          audio.play().then(() => {
+            startFadeIn();
+          }).catch(() => {});
+          EVENTS.forEach(e => window.removeEventListener(e, resume));
+        };
+
+        EVENTS.forEach(e => window.addEventListener(e, resume, { once: true }));
+      });
     } else {
-      // Fade out: mevcut ses → 0 (1 saniye)
       const step = audio.volume / 20;
       if (step === 0) return;
       fadeRef.current = setInterval(() => {
