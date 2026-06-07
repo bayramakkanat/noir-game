@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBgMusic } from './hooks/useBgMusic.js';
 import { useFullscreen } from './hooks/useFullscreen.js';
 import menuBg from './assets/menu-bg.png';
 import tekImg from './assets/tek.png';
@@ -185,6 +186,11 @@ export default function App() {
   const [mode, setMode] = useState('menu');
   const solo = useGameState();
   const multi = usePeerMultiplayer();
+
+  // Oyun ekranında (aktif oyun varken) muzik durur, diger tum ekranlarda calar
+  const soloInGame  = mode === 'solo'  && !!solo.game  && !solo.game.gameOver;
+  const multiInGame = mode === 'multi' && !!multi.game && !multi.game.gameOver && multi.status === 'playing';
+  useBgMusic(!soloInGame && !multiInGame);
 
   if (mode === 'menu') {
     return <div className="grain"><MainMenu onSelect={setMode} /></div>;
