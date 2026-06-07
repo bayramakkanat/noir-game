@@ -1,11 +1,11 @@
-import { useState } from 'react';
+
 import { useFullscreen } from '../hooks/useFullscreen.js';
 import menuBg from '../assets/menu-bg.png';
 import AmbientBackground from '../components/AmbientBackground.jsx';
-import HowToPlayModal from '../components/HowToPlayModal.jsx';
+
 
 export default function SetupScreen({ onStart, onBack }) {
-  const [rulesOpen, setRulesOpen] = useState(false);
+
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   return (
@@ -45,19 +45,11 @@ export default function SetupScreen({ onStart, onBack }) {
           >
             {isFullscreen ? '⛶' : '⛶'}
           </button>
-          <button
-            type="button"
-            onClick={() => setRulesOpen(true)}
-            title="Nasıl oynanır?"
-            aria-label="Nasıl oynanır"
-            className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors"
-          >
-            ?
-          </button>
+
         </div>
       </div>
 
-      {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} />}
+
 
       {/* Başlık */}
       <div className="relative z-10 mb-12 text-center anim-fade-in">

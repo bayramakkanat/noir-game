@@ -4,7 +4,71 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { PHASE, TURN, CELL_STATUS } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
-import HowToPlayModal from '../components/HowToPlayModal.jsx';
+
+
+/* ── Aksiyon buton stilleri (desktop geniş + mobil kompakt) ── */
+const actionBtnStyles = `
+  .noir-action-btn { display:block; width:100%; background:none; border:none; padding:0; cursor:pointer; text-align:left; transition:transform 0.15s; }
+  .noir-action-btn:hover { transform:translateY(-1px); }
+  .noir-action-btn:active { transform:scale(0.98); }
+  .noir-action-btn:disabled { opacity:0.3; pointer-events:none; }
+  .nb-inner { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:10px; border:1px solid; transition:border-color 0.2s, background 0.2s; }
+  .nb-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px; }
+  .nb-text { flex:1; min-width:0; }
+  .nb-title { display:block; font-size:11px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase; margin-bottom:2px; }
+  .nb-sub { display:block; font-size:10px; letter-spacing:0.06em; opacity:0.5; }
+  .nb-arrow { font-size:14px; opacity:0.4; flex-shrink:0; }
+  /* renk: kırmızı (kill) */
+  .nb-kill .nb-inner { background:rgba(192,57,43,0.08); border-color:rgba(192,57,43,0.3); }
+  .nb-kill:hover .nb-inner { background:rgba(192,57,43,0.16); border-color:rgba(192,57,43,0.65); }
+  .nb-kill .nb-icon { background:rgba(192,57,43,0.18); }
+  .nb-kill .nb-title { color:#E05A4A; }
+  .nb-kill .nb-arrow { color:#E05A4A; }
+  .nb-kill.nb-active .nb-inner { background:rgba(192,57,43,0.22); border-color:rgba(192,57,43,0.85); }
+  .nb-kill.nb-active .nb-title { color:#FF7060; }
+  .nb-kill.nb-active .nb-sub { opacity:0.8; color:#FF9080; }
+  .nb-kill.nb-active .nb-arrow { opacity:1; color:#FF7060; }
+  /* renk: mor (disguise) */
+  .nb-purple .nb-inner { background:rgba(120,80,200,0.07); border-color:rgba(120,80,200,0.25); }
+  .nb-purple:hover .nb-inner { background:rgba(120,80,200,0.15); border-color:rgba(120,80,200,0.55); }
+  .nb-purple .nb-icon { background:rgba(120,80,200,0.18); }
+  .nb-purple .nb-title { color:#A080E0; }
+  .nb-purple .nb-arrow { color:#A080E0; }
+  /* renk: mavi (arrest) */
+  .nb-blue .nb-inner { background:rgba(48,96,200,0.07); border-color:rgba(48,96,200,0.25); }
+  .nb-blue:hover .nb-inner { background:rgba(48,96,200,0.15); border-color:rgba(48,96,200,0.6); }
+  .nb-blue .nb-icon { background:rgba(48,96,200,0.18); }
+  .nb-blue .nb-title { color:#6090E0; }
+  .nb-blue .nb-arrow { color:#6090E0; }
+  .nb-blue.nb-active .nb-inner { background:rgba(48,96,200,0.22); border-color:rgba(48,96,200,0.85); }
+  .nb-blue.nb-active .nb-title { color:#80B0FF; }
+  .nb-blue.nb-active .nb-sub { opacity:0.8; color:#A0C0FF; }
+  .nb-blue.nb-active .nb-arrow { opacity:1; color:#80B0FF; }
+  /* renk: yeşil (exonerate) */
+  .nb-green .nb-inner { background:rgba(30,140,80,0.07); border-color:rgba(30,140,80,0.25); }
+  .nb-green:hover .nb-inner { background:rgba(30,140,80,0.15); border-color:rgba(30,140,80,0.6); }
+  .nb-green .nb-icon { background:rgba(30,140,80,0.18); }
+  .nb-green .nb-title { color:#50C080; }
+  .nb-green .nb-arrow { color:#50C080; }
+  /* renk: sarı (shift) */
+  .nb-yellow .nb-inner { background:rgba(200,168,75,0.07); border-color:rgba(200,168,75,0.22); }
+  .nb-yellow:hover .nb-inner { background:rgba(200,168,75,0.15); border-color:rgba(200,168,75,0.55); }
+  .nb-yellow .nb-icon { background:rgba(200,168,75,0.16); }
+  .nb-yellow .nb-title { color:#C8A84B; }
+  .nb-yellow .nb-arrow { color:#C8A84B; }
+  .nb-yellow.nb-active .nb-inner { background:rgba(200,168,75,0.18); border-color:rgba(200,168,75,0.8); }
+  .nb-yellow.nb-active .nb-title { color:#F0CC70; }
+  .nb-yellow.nb-active .nb-sub { opacity:0.8; color:#F0CC70; }
+  .nb-yellow.nb-active .nb-arrow { opacity:1; color:#F0CC70; }
+  /* Mobil: ikon+başlık yan yana, alt metin gizli */
+  @media (max-width:1023px) {
+    .nb-inner { padding:8px 10px; gap:8px; border-radius:8px; }
+    .nb-icon { width:26px; height:26px; font-size:13px; border-radius:6px; }
+    .nb-title { font-size:10px; letter-spacing:0.14em; margin-bottom:0; }
+    .nb-sub { display:none; }
+    .nb-arrow { font-size:12px; }
+  }
+`;
 
 const BOARD_LAYOUT_TRANSITION = {
   type: 'tween',
@@ -657,18 +721,7 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
 </button>
             )}
 
-            {/* YARDIM (?) */}
-            {onOpenRules && (
-              <button
-                type="button"
-                onClick={onOpenRules}
-                title="Nasıl oynanır?"
-                aria-label="Nasıl oynanır"
-                className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 text-[#707088] hover:text-noir-accent hover:border-noir-accent/45 hover:bg-noir-accent/5 font-mono text-sm leading-none transition-colors"
-              >
-                ?
-              </button>
-            )}
+
 
             {/* DURUM MESAJI (Bekleniyor / Senin turun) */}
             <div className="flex flex-col items-end gap-0 ml-1">
@@ -742,22 +795,31 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
               <>
                 <button
                   onClick={() => pendingAction === 'kill' ? actions.cancelPending() : actions.setPending('kill')}
-                  className={`w-full px-4 py-2.5 rounded-lg border font-mono text-xs tracking-widest uppercase transition-all text-left flex items-center gap-2 ${
-                    pendingAction === 'kill'
-                      ? 'border-red-700 bg-red-900/20 text-red-400'
-                      : 'border-noir-border text-noir-muted hover:border-red-700 hover:text-red-400'
-                  }`}
+                  className={`noir-action-btn nb-kill${pendingAction === 'kill' ? ' nb-active' : ''}`}
                 >
-                  🗡️ {isKillerFirstKill ? 'Hedef Seç' : 'Öldür'}
-                  {pendingAction === 'kill' && <span className="ml-auto text-[10px] opacity-60">tahtaya tıkla</span>}
+                  <div className="nb-inner">
+                    <div className="nb-icon">🗡️</div>
+                    <div className="nb-text">
+                      <span className="nb-title">{isKillerFirstKill ? 'Hedef Seç' : 'Öldür'}</span>
+                      <span className="nb-sub">{pendingAction === 'kill' ? 'Tahtada bir karta tıkla' : 'Komşu bir şüpheliyi hedefle'}</span>
+                    </div>
+                    <span className="nb-arrow">{pendingAction === 'kill' ? '✕' : '›'}</span>
+                  </div>
                 </button>
                 {inPlay && (
                   <button
                     onClick={actions.executeDisguise}
                     disabled={evidenceDeck.length === 0}
-                    className="w-full px-4 py-2.5 rounded-lg border border-noir-border/60 text-[#AAAAB0] font-mono text-xs tracking-widest uppercase hover:border-purple-700 hover:text-purple-400 transition-all text-left flex items-center gap-2 disabled:opacity-30 disabled:pointer-events-none"
+                    className="noir-action-btn nb-purple"
                   >
-                    ⇄ Kılık Değiştir
+                    <div className="nb-inner">
+                      <div className="nb-icon">⇄</div>
+                      <div className="nb-text">
+                        <span className="nb-title">Kılık Değiştir</span>
+                        <span className="nb-sub">Desteden yeni kimlik çek</span>
+                      </div>
+                      <span className="nb-arrow">›</span>
+                    </div>
                   </button>
                 )}
               </>
@@ -767,21 +829,30 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
               <>
                 <button
                   onClick={() => pendingAction === 'arrest' ? actions.cancelPending() : actions.setPending('arrest')}
-                  className={`w-full px-4 py-2.5 rounded-lg border font-mono text-xs tracking-widest uppercase transition-all text-left flex items-center gap-2 ${
-                    pendingAction === 'arrest'
-                      ? 'border-blue-600 bg-blue-900/20 text-blue-400'
-                      : 'border-noir-border/60 text-[#AAAAB0] hover:border-blue-600 hover:text-blue-400'
-                  }`}
+                  className={`noir-action-btn nb-blue${pendingAction === 'arrest' ? ' nb-active' : ''}`}
                 >
-                  🔍 Tutuklama
-                  {pendingAction === 'arrest' && <span className="ml-auto text-[10px] opacity-60">tahtaya tıkla</span>}
+                  <div className="nb-inner">
+                    <div className="nb-icon">🔍</div>
+                    <div className="nb-text">
+                      <span className="nb-title">Tutuklama</span>
+                      <span className="nb-sub">{pendingAction === 'arrest' ? 'Tahtada bir karta tıkla' : 'Şüpheliyi tutuklat'}</span>
+                    </div>
+                    <span className="nb-arrow">{pendingAction === 'arrest' ? '✕' : '›'}</span>
+                  </div>
                 </button>
                 <button
                   onClick={actions.beginExonerate}
                   disabled={evidenceDeck.length === 0 || inspector.hand.length === 0}
-                  className="w-full px-4 py-2.5 rounded-lg border border-noir-border/60 text-[#AAAAB0] font-mono text-xs tracking-widest uppercase hover:border-green-700 hover:text-green-400 transition-all text-left flex items-center gap-2 disabled:opacity-30 disabled:pointer-events-none"
+                  className="noir-action-btn nb-green"
                 >
-                  ✓ Temize Çıkar
+                  <div className="nb-inner">
+                    <div className="nb-icon">✓</div>
+                    <div className="nb-text">
+                      <span className="nb-title">Temize Çıkar</span>
+                      <span className="nb-sub">Elindeki kartı at, masumu kurtар</span>
+                    </div>
+                    <span className="nb-arrow">›</span>
+                  </div>
                 </button>
               </>
             )}
@@ -789,14 +860,16 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
             {inPlay && (
               <button
                 onClick={() => pendingAction === 'shift' ? actions.cancelPending() : actions.beginShift()}
-                className={`w-full px-4 py-2.5 rounded-lg border font-mono text-xs tracking-widest uppercase transition-all text-left flex items-center gap-2 ${
-                  pendingAction === 'shift'
-                    ? 'border-yellow-600 bg-yellow-900/10 text-yellow-400'
-                    : 'border-noir-border/60 text-[#AAAAB0] hover:border-yellow-700 hover:text-yellow-400'
-                }`}
+                className={`noir-action-btn nb-yellow${pendingAction === 'shift' ? ' nb-active' : ''}`}
               >
-                ↔ Tahta Kaydır
-                {pendingAction === 'shift' && <span className="ml-auto text-[10px] opacity-60">ok'a tıkla</span>}
+                <div className="nb-inner">
+                  <div className="nb-icon">↔</div>
+                  <div className="nb-text">
+                    <span className="nb-title">Tahta Kaydır</span>
+                    <span className="nb-sub">{pendingAction === 'shift' ? 'Yön okuna tıkla' : 'Satır veya sütunu kaydır'}</span>
+                  </div>
+                  <span className="nb-arrow">{pendingAction === 'shift' ? '✕' : '›'}</span>
+                </div>
               </button>
             )}
           </div>
@@ -858,7 +931,7 @@ export default function GameScreen({ game, actions, onQuit }) {
     return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
   }
   
-  const [rulesOpen, setRulesOpen] = useState(false);
+
 
   const activeRows = game.board
     .map((row, r) => ({ r, isEmpty: row.every(cell => cell === null) }))
@@ -875,6 +948,7 @@ export default function GameScreen({ game, actions, onQuit }) {
 
   return (
     <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
+      <style>{actionBtnStyles}</style>
       <div className="relative z-10 flex flex-1 flex-col lg:flex-row w-full min-h-0 min-w-0">
         <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0">
           <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
@@ -883,12 +957,12 @@ export default function GameScreen({ game, actions, onQuit }) {
           game={game}
           actions={actions}
           onQuit={onQuit}
-          onOpenRules={() => setRulesOpen(true)}
+
         />
       </div>
       <ExonerateOverlay game={game} actions={actions} />
       <ToastNotification logs={game.logs} />
-      {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} />}
+
     </div>
   );
 }
