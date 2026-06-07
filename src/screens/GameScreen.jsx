@@ -183,12 +183,33 @@ function useGridCellSize(numRows, numCols) {
   return cellSize;
 }
 
+// ─── Tutuklama flash efekti ──────────────────────────────────────────────────
+function useArrestFlash(game) {
+  const [flashId, setFlashId] = React.useState(null);
+  const prevInvestigated = React.useRef([]);
+
+  React.useEffect(() => {
+    const curr = game.inspector.investigated ?? [];
+    const prev = prevInvestigated.current;
+    if (curr.length > prev.length) {
+      const newId = curr[curr.length - 1];
+      setFlashId(newId);
+      const t = setTimeout(() => setFlashId(null), 1800);
+      prevInvestigated.current = curr;
+      return () => clearTimeout(t);
+    }
+    prevInvestigated.current = curr;
+  }, [game.inspector.investigated]);
+
+  return flashId;
+}
+
 function suspect(id) {
   return SUSPECTS.find((s) => s.id === id) ?? { id, name: `#${id}` };
 }
 
-// ─── Tahta hücresi ────────────────────────────────────────────────────────────
-function BoardCell({ cell, r, c, game, actions, cellSize }) {
+// ─── Tahta hücresi ────────────────────────────────────────────────────────────────────────────────
+function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
   const { pendingAction, humanRole, phase, turn } = game;
   const secrets = actions.getActingSecrets(game);
   const humanCanAct = (() => {
@@ -259,6 +280,8 @@ function BoardCell({ cell, r, c, game, actions, cellSize }) {
     return false;
   })();
 
+  const isArrestFlash = cell && arrestFlashId === cell.suspectId;
+
   return (
     <motion.div
       layout="position"
@@ -274,6 +297,20 @@ function BoardCell({ cell, r, c, game, actions, cellSize }) {
     >
       {(isTargetable || isPickable) && (
         <div className="absolute inset-0 rounded-lg ring-[3px] ring-yellow-400 animate-pulse pointer-events-none z-20" />
+      )}
+      {/* Tutuklama flash efekti — mavi titreme */}
+      {isArrestFlash && (
+        <motion.div
+          className="absolute inset-0 rounded-lg pointer-events-none z-30"
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: [0, 0.85, 0.6, 0.85, 0.5, 0], scale: [0.92, 1.06, 1, 1.04, 1, 0.96] }}
+          transition={{ duration: 1.6, ease: 'easeInOut' }}
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.1) 60%, transparent 100%)',
+            boxShadow: '0 0 20px rgba(59,130,246,0.6), inset 0 0 14px rgba(59,130,246,0.3)',
+            border: '2px solid rgba(99,179,237,0.8)',
+          }}
+        />
       )}
       <SuspectCard
         suspect={suspect(cell.suspectId)}
@@ -320,8 +357,9 @@ function ArrowBtn({ onClick, dir, highlighted }) {
 
 // ─── Grid + ok sistemi ────────────────────────────────────────────────────────
 function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
-  // 🔥 YENİ SATIR
   if (!activeRows.length || !activeCols.length) return <div className="text-white/50 p-8">Yükleniyor...</div>;
+  
+  const arrestFlashId = useArrestFlash(game);
   
   const { pendingAction, pendingShift, phase, turn, humanRole } = game;
   const humanCanAct = (() => {
@@ -420,7 +458,7 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
                     position: 'relative',
                   }}
                 >
-                  <BoardCell cell={cell} r={r} c={c} game={game} actions={actions} cellSize={CELL} />
+                  <BoardCell cell={cell} r={r} c={c} game={game} actions={actions} cellSize={CELL} arrestFlashId={arrestFlashId} />
                 </motion.div>
               );
             })
@@ -500,14 +538,17 @@ function ExonerateOverlay({ game, actions }) {
         <h2 className="font-display text-xl text-noir-text mb-1">Hangi kartı at?</h2>
         <p className="text-xs text-[#7A7A6A] font-mono mb-6">Seçtiğin kart açıklanır; desteden yeni bir kart çekersin.</p>
         <div className="flex flex-wrap gap-4 justify-center">
-          {game.inspector.hand
-            .filter((id) => !(game.killedSuspectIds ?? []).includes(id))
-            .map((id) => (
-            <div key={id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => actions.completeExonerate(id)}>
-              <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" />
-              <div className="text-[10px] font-mono text-noir-muted group-hover:text-green-400 transition-colors tracking-widest uppercase">At & Temize Çıkar</div>
-            </div>
-          ))}
+          {game.inspector.hand.map((id) => {
+            const isDeceased = (game.killedSuspectIds ?? []).includes(id);
+            return (
+              <div key={id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => actions.completeExonerate(id)}>
+                <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" state={isDeceased ? 'eliminated' : 'normal'} />
+                <div className="text-[10px] font-mono text-noir-muted group-hover:text-green-400 transition-colors tracking-widest uppercase">
+                  {isDeceased ? 'At & El Yenile' : 'At & Temize Çıkar'}
+                </div>
+              </div>
+            );
+          })}
         </div>
         <button onClick={actions.cancelPending} className="mt-5 text-[10px] text-[#8080A0] font-mono block mx-auto hover:text-[#AAAAB0]">iptal</button>
       </div>

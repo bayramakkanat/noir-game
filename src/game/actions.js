@@ -121,8 +121,9 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
 // ─── Exonerate ───────────────────────────────────────────────────────────────
 export function applyExonerate(game, discardFromHandId) {
   if (game.evidenceDeck.length === 0) return { ok: false, game };
-  if (!game.inspector.hand.includes(discardFromHandId)) return { ok: false, game };
-  if ((game.killedSuspectIds ?? []).includes(discardFromHandId)) return { ok: false, game };
+  if (!game.inspector.hand || !game.inspector.hand.includes(discardFromHandId)) return { ok: false, game };
+
+  const isDeceased = (game.killedSuspectIds ?? []).includes(discardFromHandId);
 
   const { drawn, remaining } = drawCards(game.evidenceDeck, 1);
   const drawnId = drawn[0];
@@ -132,12 +133,21 @@ export function applyExonerate(game, discardFromHandId) {
     ...game,
     evidenceDeck: remaining,
     inspector: { ...game.inspector, hand: [...hand, drawnId] },
-    publicExonerated: [...game.publicExonerated, discardFromHandId],
+    // Ölü kart ise sadece el yenilenir, masum listesine eklenmez
+    publicExonerated: isDeceased
+      ? game.publicExonerated
+      : [...game.publicExonerated, discardFromHandId],
     discardPile: [...game.discardPile, discardFromHandId],
     pendingAction: null,
     pendingExonerateDiscard: null,
   };
-  next = addLog(next, `✓ Temize çıkarıldı: <b>${suspectName(discardFromHandId)}</b>.`);
+
+  if (isDeceased) {
+    next = addLog(next, `↺ <b>${suspectName(discardFromHandId)}</b> zaten ölmüş — kart atıldı, el yenilendi.`);
+  } else {
+    next = addLog(next, `✓ Temize çıkarıldı: <b>${suspectName(discardFromHandId)}</b>.`);
+  }
+
   next = advanceTurnAfterAction(next);
   return { ok: true, game: next };
 }

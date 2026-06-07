@@ -139,13 +139,17 @@ export function useGameState() {
     if (!aiActiveSide) return;
     if (aiGameOver) return;
     if (aiActiveSide !== 'ai') return;
-    // Kimlik seçim fazlarında AI mantığı zaten runAiLogic içinde var, çalıştır
     const timer = setTimeout(() => {
       setGame((prev) => {
         if (!prev || prev.gameOver || prev.activeSide !== 'ai') return prev;
-        return runAiLogic(prev);
+        const next = runAiLogic(prev);
+        // Eğer AI hiçbir şey yapamadıysa (aynı state döndü) zorla ilerle
+        if (next === prev) {
+          console.warn('[AI] Takıldı, faz:', prev.phase, 'el:', prev.inspector.hand);
+        }
+        return next;
       });
-    }, 800); // 800ms bekleme — oyuncu hamleyi görsün
+    }, 800);
     return () => clearTimeout(timer);
   }, [aiActiveSide, aiTurn, aiPhase, aiGameOver]);
 

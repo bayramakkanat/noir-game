@@ -233,8 +233,17 @@ export function runAiTurn(game) {
 
   // Faz: Dedektif kimlik seçimi
   if (game.phase === PHASE.INSPECTOR_PICK_IDENTITY) {
-    const card = pickRandom(game.inspector.hand);
-    if (!card) return game;
+    const hand = game.inspector.hand ?? [];
+    if (!hand.length) {
+      // El boşsa fallback: dedektifi tahtadan rastgele bir canlı karaktere ata
+      const aliveIds = game.board.flat()
+        .filter(c => c && c.status === 'alive')
+        .map(c => c.suspectId);
+      const fallback = pickRandom(aliveIds);
+      if (!fallback) return game;
+      return applyInspectorPickIdentity({ ...game, inspector: { ...game.inspector, hand: [fallback] } }, fallback).game;
+    }
+    const card = pickRandom(hand);
     return applyInspectorPickIdentity(game, card).game;
   }
 
@@ -276,6 +285,7 @@ export function runAiTurn(game) {
 
   const killSites = getKillSites(game);
   const deceasedCount = game.killCount ?? killSites.length;
+  const deceasedIds = new Set(game.killedSuspectIds ?? []);
   const investigation = evaluateInspectorInvestigation(game, game.board, killSites);
 
   const scoredTargets = arrestTargets
@@ -304,7 +314,16 @@ export function runAiTurn(game) {
     return pickRandom(best.length ? best : scoredTargets);
   };
 
-  // 1) Güçlü ipucu — cinayet komşusu ve yüksek skor
+  // ── Dedektif karar matrisi ──────────────────────────────────────────────────
+  // Strateji öncelik sırası:
+  //   A) Çok güçlü ipucu → tutuklama
+  //   B) Elimde ölü kart var → at, el yenile (her zaman yapılmalı)
+  //   C) exonerateP olasılığıyla temize çıkar
+  //   D) Konumlanma için kaydır
+  //   E) Orta güçlü ipucu → tutuklama
+  //   F) Fallback kaydırma / tutuklama
+
+  // A) Çok güçlü sinyal → hemen tutuklama
   if (scoredTargets.length > 0) {
     const top = scoredTargets[0];
     const strongSignal =
@@ -312,21 +331,39 @@ export function runAiTurn(game) {
       top.score >= cfg.patternWeight * 0.55 + cfg.adjacencyWeight;
     if (strongSignal && Math.random() < cfg.highScoreArrestP) {
       const t = pickArrestTarget();
-      if (t) {
-        return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
-      }
+      if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
     }
   }
 
-  // 2) Cinayet bölgesine yaklaş (kaydır) — alakasız tutuklama yerine konumlan
+  // B) Elimde ölü kart varsa → her zaman at, el yenile
+  const deadInHand = game.inspector.hand.filter(id => deceasedIds.has(id));
+  if (deadInHand.length > 0 && game.evidenceDeck.length > 0) {
+    const result = applyExonerate(game, pickRandom(deadInHand));
+    if (result.ok) return result.game;
+  }
+
+  // C) Temize çıkarma — her karar için bağımsız zar at
+  const exonerateChance =
+    scoredTargets.length > 0 && scoredTargets[0].crimeAdj > 0
+      ? cfg.exonerateP * 0.55
+      : cfg.exonerateP * 1.2;
+  if (Math.random() < exonerateChance && game.evidenceDeck.length > 0 && game.inspector.hand.length > 0) {
+    const liveInHand = game.inspector.hand.filter(id => !deceasedIds.has(id));
+    if (liveInHand.length > 0) {
+      const result = applyExonerate(game, pickRandom(liveInHand));
+      if (result.ok) return result.game;
+    }
+  }
+
+  // D) Konumlanma için kaydır
   if (shiftMove && (needsReposition || shiftHelps)) {
-    const shiftChance = needsReposition ? 0.9 : 0.6;
+    const shiftChance = needsReposition ? 0.75 : 0.45;
     if (Math.random() < shiftChance) {
       return applyShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
     }
   }
 
-  // 3) Orta düzey tutuklama — yalnızca cinayet-komşusu ve anlamlı skor
+  // E) Orta düzey tutuklama
   if (scoredTargets.length > 0) {
     const top = scoredTargets[0];
     const moderateSignal =
@@ -334,33 +371,16 @@ export function runAiTurn(game) {
       (top.crimeAdj > 0 && highestScore > cfg.patternWeight * 0.45);
     if (moderateSignal && Math.random() < cfg.highScoreArrestP * 0.65) {
       const t = pickArrestTarget();
-      if (t) {
-        return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
-      }
+      if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
     }
   }
 
-  // 4) Temize çıkar — soruşturma sıcakken daha seyrek
-  const exonerateChance =
-    deceasedCount > 0 && (needsReposition || shiftHelps)
-      ? cfg.exonerateP * 0.3
-      : cfg.exonerateP;
-  if (Math.random() < exonerateChance && game.evidenceDeck.length && game.inspector.hand.length) {
-    const deceasedIds = new Set(game.killedSuspectIds ?? []);
-    const validDiscard = game.inspector.hand.filter(
-      id => id !== game.killer.identitySuspectId && !deceasedIds.has(id)
-    );
-    if (validDiscard.length > 0) {
-      return applyExonerate(game, pickRandom(validDiscard)).game;
-    }
-  }
-
-  // 5) Kaydırma yedek
+  // F) Fallback: kaydır
   if (shiftMove) {
     return applyShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
   }
 
-  // 6) Son çare: erken oyunda rastgele tutuklama; cinayet sonrası yalnızca cinayet-komşusu
+  // G) Son çare: cinayet komşusu tutuklama
   if (arrestTargets.length) {
     const pool =
       deceasedCount > 0
