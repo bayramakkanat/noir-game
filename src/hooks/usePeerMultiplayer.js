@@ -82,11 +82,16 @@ export function usePeerMultiplayer() {
   board: game.board,
   publicExonerated: game.publicExonerated,
   lastShift: game.lastShift,
-  logs: game.logs.filter(log => 
-    !log.includes('Gizli kimliğin') && 
-    !log.includes('Kılık değiştirdin. Yeni kimliğin') &&
-    !log.includes('Yeni kimliğin')
-  ),
+  logs: game.logs.map(log => {
+    // Yeni kimlik bilgisini gizle, eski kimliği dönüştür
+    if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
+      const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
+      const eskiAd = eskiMatch ? eskiMatch[1] : '?';
+      return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
+    }
+    if (log.includes('Gizli kimliğin')) return null;
+    return log;
+  }).filter(Boolean),
   evidenceDeck: game.evidenceDeck,
   discardPile: game.discardPile,
   gameOver: game.gameOver,
@@ -149,8 +154,14 @@ export function usePeerMultiplayer() {
       // Dedektif için gelen loglarda katile özel mesajları maskele
       const sanitizedLogs = role === 'inspector'
         ? newGameState.logs.map(log => {
-            if (log.includes('Gizli kimliğin') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin'))
+            if (log.includes('Gizli kimliğin'))
               return null;
+            // Kılık değiştirme: yeni kimliği gizle, eski kimliği göster
+            if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
+              const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
+              const eskiAd = eskiMatch ? eskiMatch[1] : '?';
+              return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
+            }
             if (log.includes('Elindeki 2 karttan'))
               return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
             return log;
