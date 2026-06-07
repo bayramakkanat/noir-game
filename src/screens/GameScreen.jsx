@@ -771,12 +771,6 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
         </div>
       )}
 
-      {humanCanAct && phase === PHASE.INSPECTOR_PICK_IDENTITY && isHumanInspector && (
-        <div className="px-3 py-2 border-b border-noir-border/30 bg-blue-900/10 flex-shrink-0">
-          <p className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">Gizli Kimlik Seç</p>
-          <p className="text-[11px] text-[#AAAAB0] mt-0.5">Sarı ile işaretlenen kartlardan birini seç.</p>
-        </div>
-      )}
      
       {humanCanAct && (inPlay || isKillerFirstKill) && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
@@ -870,8 +864,29 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
         </div>
       )}
 
-      {/* Dedektif eli — sıkıştırıldı */}
-      {isHumanInspector && inspector.hand.length > 0 && (
+      {/* Dedektif gizli kimlik seçici — büyük kartlar */}
+      {humanCanAct && phase === PHASE.INSPECTOR_PICK_IDENTITY && isHumanInspector && (
+        <div className="px-3 py-3 border-b border-noir-border/30 bg-blue-900/10 flex-shrink-0">
+          <p className="font-mono text-[10px] text-blue-400 uppercase tracking-widest mb-0.5">Gizli Kimlik Seç</p>
+          <p className="text-[11px] text-[#AAAAB0] mb-3">Aşağıdaki kartlardan birini seç.</p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {inspector.hand.map((id) => (
+              <div
+                key={id}
+                className="flex flex-col items-center cursor-pointer group"
+                onClick={() => actions.pickInspectorIdentity(id)}
+              >
+                <div className="ring-2 ring-blue-500/60 group-hover:ring-blue-400 rounded-lg transition-all group-hover:scale-105">
+                  <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" state="normal" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Dedektif eli — kimlik seçme fazı dışında küçük göster */}
+      {isHumanInspector && inspector.hand.length > 0 && phase !== PHASE.INSPECTOR_PICK_IDENTITY && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
           <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
           <div className="flex flex-wrap gap-1">
