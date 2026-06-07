@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { SUSPECTS } from '../data/suspects';
 import SuspectCard from '../components/SuspectCard.jsx';
+import AmbientBackground from '../components/AmbientBackground.jsx';
+import menuBg from '../assets/menu-bg.png';
 // Karakter görsel yükleyici (SuspectCard ile aynı mantık)
 const characterImages = import.meta.glob('../assets/characters/*.png', { eager: true });
 function getCharacterImage(id) {
@@ -116,11 +118,21 @@ export default function EndScreen({ game, onReset }) {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden"
-      style={{ background: bgGradient }}
+      style={{
+        backgroundImage: `url(${menuBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
     >
-      {/* Arka plan ışıma */}
+      {/* Ambient arka plan — katil kazandıysa kırmızı, dedektif kazandıysa mavi */}
+      <AmbientBackground
+        variant={killerWon ? 'lobby' : 'setup'}
+        density="full"
+        className="z-[1]"
+      />
+      <div className="absolute inset-0 bg-black/60 z-[2]" />
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none z-[2]"
         style={{ background: `radial-gradient(ellipse, ${glowColor} 0%, transparent 70%)` }}
       />
 

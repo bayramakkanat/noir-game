@@ -71,29 +71,36 @@ export default function HowToPlayModal({ onClose }) {
           </RuleSection>
 
           <RuleSection title="Kurulum">
-            <p>5×5 tahta; 25 şüpheli alfabetik dizilir. Kanıt destesinden kartlar çekilir.</p>
+            <p>5×5 tahta; 25 şüpheli alfabetik dizilir.</p>
             <ul className="list-disc pl-5 space-y-1.5 marker:text-noir-accent/60">
-              <li>Katil 2 kart alır: biri gizli kimlik, diğeri kılık değiştirme kartı.</li>
-              <li>Dedektif 4 kart alır; biri gizli kimlik, geri kalanı elinde kalır.</li>
-              <li>Katil önce kimliğini seçer ve komşularından birini öldürerek başlar.</li>
-              <li>Ardından dedektif gizli kimliğini seçer; normal turlar başlar.</li>
+              <li>
+                <span className="text-red-400/90">Katil</span> desteden 1 kart alır; bu kart direkt gizli kimliği olur.
+                Hemen komşularından birini öldürerek başlar.
+              </li>
+              <li>
+                <span className="text-blue-400/90">Dedektif</span> 4 kart alır; birini gizli kimlik olarak seçer,
+                geri kalan 3 kart elinde kanıt kartı olarak kalır. Bu 3 karttaki karakterlerin katil
+                olamayacağını kesin olarak bilirsin.
+              </li>
             </ul>
           </RuleSection>
 
-          <RuleSection title="Katil hamleleri (sıra sende)">
+          <RuleSection title="Katil hamleleri">
             <p>Her turda <strong className="text-noir-text/90">bir</strong> hamle:</p>
             <ul className="list-disc pl-5 space-y-1.5 marker:text-red-400/50">
               <li>
                 <strong className="text-noir-text/85">Öldür</strong> — Gizli kimliğinin komşusu olan canlı bir
-                şüpheliyi öldür (kendini öldüremezsin).
+                şüpheliyi öldür. Kendi kimliğini öldüremezsin.
               </li>
               <li>
-                <strong className="text-noir-text/85">Kılık değiştir</strong> — Desteden kart çek; elindeki iki karttan
-                birini yeni kimlik seç. Eski kimliğin desteye döner.
+                <strong className="text-noir-text/85">Kılık değiştir</strong> — Desteden rastgele 1 kart çek.
+                Çekilen karakter yaşıyorsa başarılı olursun: eski kimliğin ölür, yeni karakter kimliğin olur.
+                Çekilen karakter zaten ölmüşse başarısız olursun; eski kimliğinle devam edersin. Deste bitince
+                bu hamle yapılamaz.
               </li>
               <li>
-                <strong className="text-noir-text/85">Kaydır</strong> — Bir satır veya sütunu bir kare kaydır. Bir önceki
-                hamlenin tam tersi yönde kaydıramazsın.
+                <strong className="text-noir-text/85">Kaydır</strong> — Bir satır veya sütunu bir kare kaydır.
+                Bir önceki hamlenin tam tersi yönde kaydıramazsın.
               </li>
             </ul>
           </RuleSection>
@@ -102,13 +109,13 @@ export default function HowToPlayModal({ onClose }) {
             <p>Her turda <strong className="text-noir-text/90">bir</strong> hamle:</p>
             <ul className="list-disc pl-5 space-y-1.5 marker:text-blue-400/50">
               <li>
-                <strong className="text-noir-text/85">Tutukla</strong> — Gizli kimliğinin komşularından birini (veya
-                istersen kendi kimliğini) tutukla. Yanlış kişiyse oyun devam eder; doğru kişi katilin güncel kimliğiyse
-                kazanırsın.
+                <strong className="text-noir-text/85">Tutukla</strong> — Gizli kimliğinin komşularından birini (ya
+                da kendini) tutukla. Katilin güncel kimliğiyse kazanırsın; değilse oyun devam eder.
               </li>
               <li>
-                <strong className="text-noir-text/85">Temize çıkar</strong> — Elindeki bir kartı açıkça masum ilan et,
-                desteden yeni kart çek.
+                <strong className="text-noir-text/85">Temize çıkar</strong> — Elindeki bir kanıt kartını masum ilan
+                et; desteden yeni kart çek, elini 3'te tut. Elindeki kart zaten ölmüşse yine de atıp
+                yeni kart çekebilirsin. Deste bitince bu hamle yapılamaz.
               </li>
               <li>
                 <strong className="text-noir-text/85">Kaydır</strong> — Katille aynı kaydırma kuralı.
@@ -116,23 +123,29 @@ export default function HowToPlayModal({ onClose }) {
             </ul>
           </RuleSection>
 
-          <RuleSection title="Tahta ve cinayetler">
+          <RuleSection title="Tahta daralması">
             <p>
               Bir satır veya sütundaki tüm karakterler öldüğünde o satır/sütun tahtadan kalkar; alan daralır.
-              Komşuluk, kalan aktif hücrelere göre hesaplanır (boşluklar atlanır).
+              Komşuluk, kalan aktif hücrelere göre hesaplanır.
             </p>
             <p>
-              Katil yalnızca <em>o anki</em> kimliğinin komşularını öldürebilir; dedektif de tutuklamayı kendi gizli
-              kimliğinin çevresinden yapar. Cinayet mahali ile tutuklama alanı her zaman aynı değildir — tahtayı
-              kaydırarak konumları değiştirmek stratejinin parçasıdır.
+              Katil kılık değiştirince eski kimliği de ölü sayılır ve tahta daralmasına katkıda bulunur.
             </p>
           </RuleSection>
 
           <RuleSection title="İpuçları">
             <ul className="list-disc pl-5 space-y-1.5 marker:text-noir-accent/50">
-              <li>Katil öldürdükçe dedektif örüntüyü takip edebilir; kılık değiştirmek izini karıştırır.</li>
-              <li>Masum ilan edilen kartlar herkese açıktır; elindeki gizli kartları iyi yönet.</li>
-              <li>Kaydırma hem seni hem rakibi etkiler; hamleyi planla.</li>
+              <li>
+                Katil öldürdükçe cinayet örüntüsü oluşur; dedektif bunu takip edebilir.
+                Kılık değiştirmek hem pozisyonu hem örüntüyü karıştırır.
+              </li>
+              <li>
+                Dedektif elindeki 3 kanıt kartının katil olamayacağını bilir — bu kartları
+                temize çıkararak alanı daraltabilir ve yeni ipuçları elde edebilir.
+              </li>
+              <li>
+                Kaydırma hem seni hem rakibi etkiler; hamleyi dikkatli planla.
+              </li>
             </ul>
           </RuleSection>
         </div>

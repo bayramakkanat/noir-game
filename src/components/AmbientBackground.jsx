@@ -34,9 +34,9 @@ const DENSITY_COUNT = { subtle: 7, medium: 11, full: 15 };
 
 const GLOW_STYLES = {
   menu: {
-    top: 'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(200,168,75,0.2) 0%, transparent 70%)',
-    bottom: 'radial-gradient(ellipse 60% 40% at 50% 100%, rgba(192,57,43,0.12) 0%, transparent 70%)',
-    accent: 'rgba(200,168,75,0.08)',
+    top: 'radial-gradient(ellipse 85% 55% at 50% 0%, rgba(200,168,75,0.35) 0%, transparent 70%)',
+    bottom: 'radial-gradient(ellipse 65% 45% at 50% 100%, rgba(192,57,43,0.22) 0%, transparent 70%)',
+    accent: 'rgba(200,168,75,0.16)',
   },
   lobby: {
     top: 'radial-gradient(ellipse 90% 55% at 50% 0%, rgba(192,57,43,0.45) 0%, transparent 70%)',
@@ -61,16 +61,16 @@ function FloatingCard({ suspect, style, index, maxOpacity, cardSize }) {
 
   return (
     <motion.div
-      className="absolute rounded-lg overflow-hidden border border-white/[0.07] shadow-xl select-none pointer-events-none"
+      className="absolute rounded-lg overflow-hidden border border-white/[0.12] shadow-xl select-none pointer-events-none"
       style={{
         width: cardSize.width,
         height: cardSize.height,
         ...style,
       }}
-      initial={{ opacity: maxOpacity * 0.65, y: 6 }}
+      initial={{ opacity: maxOpacity * 0.7, y: 6 }}
       animate={{
-        opacity: [maxOpacity * 0.65, maxOpacity, maxOpacity * 0.92, maxOpacity * 0.35],
-        y: [6, -6, -18, -32],
+        opacity: [maxOpacity * 0.7, maxOpacity, maxOpacity * 0.85, maxOpacity * 0.55],
+        y: [6, -8, -20, -36],
         rotate: style.rotate ?? 0,
       }}
       transition={{
@@ -86,14 +86,14 @@ function FloatingCard({ suspect, style, index, maxOpacity, cardSize }) {
           src={img}
           alt=""
           aria-hidden
-          className="w-full h-full object-cover object-top grayscale"
+          className="w-full h-full object-cover object-top grayscale brightness-90"
           draggable={false}
         />
       ) : (
         <div className="w-full h-full bg-[#13131E]" />
       )}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/75 to-transparent pb-1 pt-3 text-center">
-        <div className="font-mono text-[7px] text-white/35 truncate px-1">{suspect.name}</div>
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent pb-1 pt-3 text-center">
+        <div className="font-mono text-[7px] text-white/40 truncate px-1">{suspect.name}</div>
       </div>
     </motion.div>
   );
@@ -103,10 +103,10 @@ function FloatingCards({ density = 'medium', maxOpacity = 0.2 }) {
   const count = DENSITY_COUNT[density] ?? DENSITY_COUNT.medium;
   const cardSize =
     density === 'subtle'
-      ? { width: 56, height: 76 }
+      ? { width: 64, height: 88 }
       : density === 'full'
-        ? { width: 72, height: 98 }
-        : { width: 64, height: 88 };
+        ? { width: 86, height: 116 }
+        : { width: 74, height: 100 };
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
@@ -157,7 +157,7 @@ export default function AmbientBackground({
   density = 'medium',
   className = '',
 }) {
-  const maxOpacity = variant === 'game' ? 0.12 : variant === 'menu' ? 0.22 : 0.30;
+  const maxOpacity = variant === 'game' ? 0.12 : variant === 'menu' ? 0.42 : 0.50;
 
   return (
     <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`} aria-hidden>
