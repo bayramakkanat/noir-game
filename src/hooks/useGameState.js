@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClassicGame } from '../game/setup.js';
 import { PHASE } from '../game/constants.js';
 import {
@@ -134,12 +134,23 @@ export function useGameState() {
   const aiGameOver = game?.gameOver;
 
   // ── Otomatik AI turu ──────────────────────────────────────────────────────
-  // game.activeSide 'ai' olduğunda kısa bir gecikme sonrası AI'yı otomatik oynat
+  // game.activeSide 'ai' olduğunda kısa bir gecikme sonrası AI'yı otomatik oynat.
+  // aiTimerRef: React Strict Mode'un double-invoke davranışından kaynaklanan
+  // çift timer sorununu önler. Effect cleanup'ta timer iptal edilir, böylece
+  // aynı AI turu için yalnızca tek bir setTimeout aktif kalır.
+  const aiTimerRef = useRef(null);
+
   useEffect(() => {
-    if (!aiActiveSide) return;
-    if (aiGameOver) return;
-    if (aiActiveSide !== 'ai') return;
-    const timer = setTimeout(() => {
+    if (!aiActiveSide || aiGameOver || aiActiveSide !== 'ai') return;
+
+    // Varsa önceki timer'ı iptal et (Strict Mode çift mount koruması)
+    if (aiTimerRef.current !== null) {
+      clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = null;
+    }
+
+    aiTimerRef.current = setTimeout(() => {
+      aiTimerRef.current = null;
       setGame((prev) => {
         if (!prev || prev.gameOver || prev.activeSide !== 'ai') return prev;
         const next = runAiLogic(prev);
@@ -150,7 +161,13 @@ export function useGameState() {
         return next;
       });
     }, 800);
-    return () => clearTimeout(timer);
+
+    return () => {
+      if (aiTimerRef.current !== null) {
+        clearTimeout(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
+    };
   }, [aiActiveSide, aiTurn, aiPhase, aiGameOver]);
 
   return {
