@@ -76,22 +76,29 @@ export function usePeerMultiplayer() {
   }, []);
 
   // Game state serialization (gizli bilgiler olmadan)
-  const serializeGameState = useCallback((game) => ({
+  // targetRole: kimin için serialize ediyoruz ('killer' veya 'inspector')
+  const serializeGameState = useCallback((game, targetRole = 'inspector') => ({
   phase: game.phase,
   turn: game.turn,
   board: game.board,
   publicExonerated: game.publicExonerated,
   lastShift: game.lastShift,
-  logs: game.logs.map(log => {
-    // Yeni kimlik bilgisini gizle, eski kimliği dönüştür
-    if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
-      const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
-      const eskiAd = eskiMatch ? eskiMatch[1] : '?';
-      return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
-    }
-    if (log.includes('Gizli kimliğin')) return null;
-    return log;
-  }).filter(Boolean),
+  logs: targetRole === 'inspector'
+    ? game.logs.map(log => {
+        // Dedektife gönderilirken katile özel log'ları maskele
+        if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
+          const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
+          const eskiAd = eskiMatch ? eskiMatch[1] : '?';
+          return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
+        }
+        if (log.includes('Gizli kimliğin')) return null;
+        return log;
+      }).filter(Boolean)
+    : game.logs.map(log => {
+        // Dedektifin gizli kimliğini katile gösterme
+        if (log.includes('Gizli kimliğin')) return null;
+        return log;
+      }).filter(Boolean), // Katile gönderilirken sadece inspector sırrını gizle
   evidenceDeck: game.evidenceDeck,
   discardPile: game.discardPile,
   gameOver: game.gameOver,
@@ -115,7 +122,10 @@ export function usePeerMultiplayer() {
   const serializeAction = useCallback((type, payload, newGameState) => ({
     type,
     payload,
-    newGameState: serializeGameState(newGameState),
+    // Dedektife gönderilecek state (inspector için filtreli)
+    newGameState: serializeGameState(newGameState, 'inspector'),
+    // Katile gönderilecek state (killer için filtresiz) — aynı aksiyon objesinde taşı
+    newGameStateForKiller: serializeGameState(newGameState, 'killer'),
   }), [serializeGameState]);
 
   // Hamle gönder
@@ -144,19 +154,25 @@ export function usePeerMultiplayer() {
     setStatus('playing');
   } 
   else if (data.type === 'action') {
-    const { type, payload, newGameState } = data.data;
+    const { type, payload, newGameState, newGameStateForKiller } = data.data;
     console.log('Aksiyon geldi:', type, payload);
     
     setGame(prev => {
       if (!prev) return prev;
       const role = myRoleRef.current;
 
-      // Dedektif için gelen loglarda katile özel mesajları maskele
+      // Role göre doğru state'i seç:
+      // - Katil ise filtresiz newGameStateForKiller kullan (log'lar bozulmamış)
+      // - Dedektif ise filtrelenmiş newGameState kullan
+      const roleState = role === 'killer' && newGameStateForKiller
+        ? newGameStateForKiller
+        : newGameState;
+
+      // Dedektif için inspector'a özel log'ları maskele
       const sanitizedLogs = role === 'inspector'
-        ? newGameState.logs.map(log => {
+        ? roleState.logs.map(log => {
             if (log.includes('Gizli kimliğin'))
               return null;
-            // Kılık değiştirme: yeni kimliği gizle, eski kimliği göster
             if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
               const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
               const eskiAd = eskiMatch ? eskiMatch[1] : '?';
@@ -166,24 +182,24 @@ export function usePeerMultiplayer() {
               return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
             return log;
           }).filter(Boolean)
-        : newGameState.logs;
+        : roleState.logs; // Katil: log'lara dokunma
 
       const updatedGame = {
-        ...newGameState,
+        ...roleState,
         logs: sanitizedLogs,
         killer: {
-          ...newGameState.killer,
+          ...roleState.killer,
           identitySuspectId:
             role === 'killer'
               ? prev.killer.identitySuspectId
-              : newGameState.killer.identitySuspectId,
+              : roleState.killer.identitySuspectId,
         },
         inspector: {
-          ...newGameState.inspector,
+          ...roleState.inspector,
           secretIdentitySuspectId:
             role === 'inspector'
               ? prev.inspector.secretIdentitySuspectId
-              : newGameState.inspector.secretIdentitySuspectId,
+              : roleState.inspector.secretIdentitySuspectId,
         },
         humanRole: role,
       };
