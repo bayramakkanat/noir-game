@@ -149,6 +149,12 @@ export function useGameState() {
       aiTimerRef.current = null;
     }
 
+    // Kılık değiştirme veya önemli bir olay sonrasında AI daha uzun bekler
+    // — oyuncu yeni kimliğini toast'ta okuyabilsin
+    const lastLog = game?.logs?.[0] ?? '';
+    const isDisguise = lastLog.includes('Kılık değiştir') || lastLog.includes('kılık değiştir');
+    const aiDelay = isDisguise ? 2800 : 800;
+
     aiTimerRef.current = setTimeout(() => {
       aiTimerRef.current = null;
       setGame((prev) => {
@@ -160,7 +166,7 @@ export function useGameState() {
         }
         return next;
       });
-    }, 800);
+    }, aiDelay);
 
     return () => {
       if (aiTimerRef.current !== null) {

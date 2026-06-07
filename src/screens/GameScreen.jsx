@@ -215,13 +215,11 @@ function ShiftOverlay({ lastShift, cellSize, activeRows, activeCols }) {
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
 // Grid önce yüksekliği doldurur, kalan alan panele gider
 // Panel minimum 260px, maksimum 440px
-const PANEL_MIN = 260;
-const PANEL_MAX = 340;
-// Panel genişliği ekranın yüzdesi olarak — büyük monitörde şişmez
-const PANEL_RATIO = 0.18;
+// Panel içeriği için gerçekçi sabit genişlik — grid tüm geri kalanı alır
+const PANEL_WIDTH = 400; // Masaüstü/laptop panel genişliği
 
 function useGridAndPanelSize(numRows, numCols) {
-  const [sizes, setSizes] = React.useState({ cellSize: 72, panelWidth: 300 });
+  const [sizes, setSizes] = React.useState({ cellSize: 72, panelWidth: PANEL_WIDTH });
 
   React.useEffect(() => {
     function calc() {
@@ -230,27 +228,25 @@ function useGridAndPanelSize(numRows, numCols) {
       const isDesktop = vw >= 1024;
 
       if (!isDesktop) {
-        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: 0 });
+        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: window.innerWidth });
         return;
       }
 
       const GAP_RATIO = 0.055;
+      const MARGIN = 16;
 
-      // 1) Panel genişligini ekran yuzdesinden hesapla, min/max ile sinirla
-      const panelWidth = Math.min(PANEL_MAX, Math.max(PANEL_MIN, Math.round(vw * PANEL_RATIO)));
-
-      // 2) Grid icin kalan alan
-      const gridAvailW = vw - panelWidth - 16;
+      // Panel sabit, grid tüm geri kalan alanı kullanır
+      const panelWidth = PANEL_WIDTH;
+      const gridAvailW = vw - panelWidth - MARGIN;
       const gridAvailH = vh - 8;
 
-      // 3) Grid once — hem genislikten hem yukseklikten ideal hucre boyutunu hesapla
+      // Hem genişlikten hem yükseklikten hücre boyutunu hesapla, küçüğü al
       const gapFromW = Math.max(3, Math.round((gridAvailW / numCols) * GAP_RATIO));
       const cellFromW = Math.floor((gridAvailW - (numCols - 1) * gapFromW) / numCols);
 
       const gapFromH = Math.max(3, Math.round((gridAvailH / numRows) * GAP_RATIO));
       const cellFromH = Math.floor((gridAvailH - (numRows - 1) * gapFromH) / numRows);
 
-      // 4) Ikisinin minimumunu al — grid her iki eksende de sigsin
       const cellSize = Math.max(60, Math.min(cellFromW, cellFromH));
 
       setSizes({ cellSize, panelWidth });
