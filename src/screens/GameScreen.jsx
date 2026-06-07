@@ -213,38 +213,57 @@ function ShiftOverlay({ lastShift, cellSize, activeRows, activeCols }) {
 }
 
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
-function useGridCellSize(numRows, numCols) {
-  const [cellSize, setCellSize] = React.useState(72);
+// Grid önce yüksekliği doldurur, kalan alan panele gider
+// Panel minimum 260px, maksimum 440px
+const PANEL_MIN = 260;
+const PANEL_MAX = 340;
+// Panel genişliği ekranın yüzdesi olarak — büyük monitörde şişmez
+const PANEL_RATIO = 0.18;
+
+function useGridAndPanelSize(numRows, numCols) {
+  const [sizes, setSizes] = React.useState({ cellSize: 72, panelWidth: 300 });
 
   React.useEffect(() => {
     function calc() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const panelW = vw >= 1024 ? 320 : 0;
-      const availW = vw - panelW - 16;
-      const availH = vh - 16;
-      
-      const estCell = Math.min(availW / numCols, availH / numRows);
-      const gap = Math.max(3, Math.round(estCell * 0.055));
-      
-      const fromW = Math.floor((availW - ((numCols - 1) * gap)) / numCols);
-      const fromH = Math.floor((availH - ((numRows - 1) * gap)) / numRows);
-      const cell = Math.max(60, Math.min(fromW, fromH));
-      setCellSize(cell);
+      const isDesktop = vw >= 1024;
+
+      if (!isDesktop) {
+        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: 0 });
+        return;
+      }
+
+      const GAP_RATIO = 0.055;
+
+      // 1) Panel genişligini ekran yuzdesinden hesapla, min/max ile sinirla
+      const panelWidth = Math.min(PANEL_MAX, Math.max(PANEL_MIN, Math.round(vw * PANEL_RATIO)));
+
+      // 2) Grid icin kalan alan
+      const gridAvailW = vw - panelWidth - 16;
+      const gridAvailH = vh - 8;
+
+      // 3) Grid once — hem genislikten hem yukseklikten ideal hucre boyutunu hesapla
+      const gapFromW = Math.max(3, Math.round((gridAvailW / numCols) * GAP_RATIO));
+      const cellFromW = Math.floor((gridAvailW - (numCols - 1) * gapFromW) / numCols);
+
+      const gapFromH = Math.max(3, Math.round((gridAvailH / numRows) * GAP_RATIO));
+      const cellFromH = Math.floor((gridAvailH - (numRows - 1) * gapFromH) / numRows);
+
+      // 4) Ikisinin minimumunu al — grid her iki eksende de sigsin
+      const cellSize = Math.max(60, Math.min(cellFromW, cellFromH));
+
+      setSizes({ cellSize, panelWidth });
     }
 
     calc();
-
     let timer;
-    function onResize() {
-      clearTimeout(timer);
-      timer = setTimeout(calc, 150);
-    }
+    function onResize() { clearTimeout(timer); timer = setTimeout(calc, 150); }
     window.addEventListener('resize', onResize);
     return () => { window.removeEventListener('resize', onResize); clearTimeout(timer); };
   }, [numRows, numCols]);
 
-  return cellSize;
+  return sizes;
 }
 
 // ─── Tutuklama flash efekti ──────────────────────────────────────────────────
@@ -652,7 +671,7 @@ function ToastNotification({ logs }) {
 }
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
-function ActionPanel({ game, actions, onQuit, onOpenRules }) {
+function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -683,113 +702,92 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
   const mySuspect = myIdentityId != null ? suspect(myIdentityId) : null;
 
   return (
-    <div className="
-      w-full lg:w-80 
-      fixed bottom-0 left-0 right-0 z-40 lg:static 
-      max-h-[50vh] lg:max-h-none overflow-y-auto lg:overflow-hidden
-      border-t lg:border-t-0 lg:border-l border-noir-border/40 
-      flex flex-col bg-[#09090F] lg:min-h-screen
-      shadow-[0_-10px_40px_rgba(0,0,0,0.8)] lg:shadow-none
-    ">
+    <div
+      className="
+        w-full lg:static
+        fixed bottom-0 left-0 right-0 z-40
+        max-h-[50vh] lg:max-h-none overflow-y-auto lg:overflow-hidden
+        border-t lg:border-t-0 lg:border-l border-noir-border/40
+        flex flex-col bg-[#09090F] lg:min-h-screen
+        shadow-[0_-10px_40px_rgba(0,0,0,0.8)] lg:shadow-none
+      "
+      style={{ width: panelWidth }}
+    >
 
-           {/* Başlık + tur - GÜNCELLENDI */}
-      <div className="p-5 border-b border-noir-border/30">
-        <div className="flex items-start justify-between gap-2">
-          
-          {/* SOL: SADECE NOIR LOGOSU */}
-          <div className="flex items-start gap-2 min-w-0">
-            <div className="min-w-0">
-              <div className="font-display text-2xl text-noir-text anim-flicker leading-none">NOIR</div>
-              <div className="font-mono text-[11px] text-[#8080A0] tracking-widest uppercase mt-1">
-                {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
-              </div>
-            </div>
-          </div>
-
-          {/* SAĞ: [🏠] [?] | Durum Mesajı | Tam Ekran Butonu */}
-          <div className="text-right flex items-center gap-2 flex-shrink-0">
-            
-            {/* ANA MENU (🏠) */}
-            {onQuit && (
-              <button
-  onClick={onQuit}
-  title="Ana Menü"
-  aria-label="Ana Menü"
-  className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all outline-none focus:outline-none"
->
-  🏠
-</button>
-            )}
-
-
-
-            {/* DURUM MESAJI (Bekleniyor / Senin turun) */}
-            <div className="flex flex-col items-end gap-0 ml-1">
-              <div className={`font-mono text-xs font-bold whitespace-nowrap ${humanCanAct ? 'text-yellow-400 anim-pulse' : 'text-[#7A7A6A]'}`}>
-                {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI oynuyor...' : '○ Bekleniyor'}
-              </div>
-              {(inPlay || isKillerFirstKill) && (
-                <div className="font-mono text-[11px] text-[#8080A0] mt-0.5 whitespace-nowrap">
-                  {isKillerTurn ? 'Katil turu' : 'Dedektif turu'}
-                </div>
-              )}
-            </div>
-
-            {/* TAM EKRAN BUTONU */}
-            <button
-              onClick={toggleFullscreen}
-              title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-              className="flex items-center justify-center w-8 h-8 rounded-lg border border-noir-border/50 bg-white/[0.04] font-mono text-base text-[#9090A8] hover:text-white hover:border-white/25 hover:bg-white/[0.08] transition-all"
-            >
-              {isFullscreen ? '⛶' : '⛶'}
+           {/* Başlık — sıkıştırıldı */}
+      <div className="px-3 py-2.5 border-b border-noir-border/30 flex items-center justify-between gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="font-display text-lg text-noir-text anim-flicker">NOIR</span>
+          <span className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase">
+            {isHumanKiller ? '🔪 Katil' : '🔍 Dedektif'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className={`font-mono text-[10px] font-bold whitespace-nowrap ${
+            humanCanAct ? 'text-yellow-400' : 'text-[#6A6A7A]'
+          }`}>
+            {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI...' : '○ Bekle'}
+          </span>
+          {onQuit && (
+            <button onClick={onQuit} title="Ana Menü"
+              className="w-7 h-7 rounded-lg border border-noir-border/40 bg-white/[0.03] text-sm text-[#9090A8] hover:text-white transition-all flex items-center justify-center">
+              🏠
             </button>
-          </div>
+          )}
+          <button onClick={toggleFullscreen} title={isFullscreen ? 'Küçült' : 'Tam ekran'}
+            className="w-7 h-7 rounded-lg border border-noir-border/40 bg-white/[0.03] text-sm text-[#9090A8] hover:text-white transition-all flex items-center justify-center">
+            ⛶
+          </button>
         </div>
       </div>
 
-      {/* Kimliğim */}
+      {/* Kimlik + istatistikler tek satırda */}
       {mySuspect && (
-        <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Kimliğim</div>
-          <div className="flex items-center gap-3">
-            <SuspectCard suspect={mySuspect} size={56} showName={false} state="mine" playerRole={humanRole} />
-            <div>
-              <div className="font-body text-sm text-noir-text font-semibold">{mySuspect.name}</div>
-              <div className="font-mono text-xs text-[#8080A0]">{isHumanKiller ? 'Katil kimliği' : 'Gizli kimlik'}</div>
+        <div className="px-3 py-2 border-b border-noir-border/30 flex items-center gap-2.5 flex-shrink-0">
+          <SuspectCard suspect={mySuspect} size={44} showName={false} state="mine" playerRole={humanRole} />
+          <div className="flex-1 min-w-0">
+            <div className="font-body text-sm text-noir-text font-semibold truncate">{mySuspect.name}</div>
+            <div className="font-mono text-[10px] text-[#8080A0]">{isHumanKiller ? 'Katil kimliği' : 'Gizli kimlik'}</div>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="text-center">
+              <div className="font-mono text-sm font-bold text-red-500">{deadCount}</div>
+              <div className="font-mono text-[9px] text-[#8080A0] uppercase">Ölü</div>
+            </div>
+            <div className="text-center">
+              <div className="font-mono text-sm font-bold text-green-500">{publicExonerated.length}</div>
+              <div className="font-mono text-[9px] text-[#8080A0] uppercase">Masum</div>
+            </div>
+            <div className="text-center">
+              <div className="font-mono text-sm font-bold text-[#AAAAAA]">{evidenceDeck.length}</div>
+              <div className="font-mono text-[9px] text-[#8080A0] uppercase">Deste</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Katilin yedek kılık kartı — kasıtlı olarak gizlendi.
-         Orijinal oyunda bu kart yüzü kapalı bekler, oyuncu ne olduğunu bilmez.
-         Kılık değiştirince desteden yeni kart gelir, arka planda çalışır. */}
+      {/* Yedek kılık kartı gizlendi */}
 
-      {/* Aksiyonlar */}
       {humanCanAct && (phase === PHASE.KILLER_PICK_IDENTITY || phase === PHASE.KILLER_PICK_DISGUISE) && isHumanKiller && (
-        <div className="p-4 border-b border-noir-border/30 bg-yellow-900/10">
-          <div className="font-mono text-xs text-yellow-400 tracking-widest uppercase mb-3">
-            Kimlik Seç
-          </div>
-          <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş kartlardan hangisi olmak istediğini seç.</p>
+        <div className="px-3 py-2 border-b border-noir-border/30 bg-yellow-900/10 flex-shrink-0">
+          <p className="font-mono text-[10px] text-yellow-400 uppercase tracking-widest">Kimlik Seç</p>
+          <p className="text-[11px] text-[#AAAAB0] mt-0.5">Tahtada sarı ile işaretlenen kartı seç.</p>
         </div>
       )}
 
       {humanCanAct && phase === PHASE.INSPECTOR_PICK_IDENTITY && isHumanInspector && (
-        <div className="p-4 border-b border-noir-border/30 bg-blue-900/10">
-          <div className="font-mono text-xs text-blue-400 tracking-widest uppercase mb-3">
-            Gizli Kimlik Seç
-          </div>
-          <p className="text-xs text-[#AAAAB0] mb-2">Tahtada sarı ile işaretlenmiş gizli kimliklerden birini seç. (Komşularını tutuklayacaksın)</p>
+        <div className="px-3 py-2 border-b border-noir-border/30 bg-blue-900/10 flex-shrink-0">
+          <p className="font-mono text-[10px] text-blue-400 uppercase tracking-widest">Gizli Kimlik Seç</p>
+          <p className="text-[11px] text-[#AAAAB0] mt-0.5">Sarı ile işaretlenen kartlardan birini seç.</p>
         </div>
       )}
      
       {humanCanAct && (inPlay || isKillerFirstKill) && (
-        <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-3">
+        <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
+          <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">
             {isKillerFirstKill ? 'İlk Hamle — Komşunu Öldür' : 'Hamle Seç'}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
 
             {isHumanKiller && (
               <>
@@ -876,44 +874,28 @@ function ActionPanel({ game, actions, onQuit, onOpenRules }) {
         </div>
       )}
 
-      {/* İstatistikler */}
-      <div className="p-4 border-b border-noir-border/30 grid grid-cols-3 gap-2">
-        <div className="text-center">
-          <div className="font-mono text-base font-bold text-red-500">{deadCount}</div>
-          <div className="font-mono text-xs text-[#8080A0] uppercase">Ölü</div>
-        </div>
-        <div className="text-center">
-          <div className="font-mono text-base font-bold text-green-500">{publicExonerated.length}</div>
-          <div className="font-mono text-xs text-[#8080A0] uppercase">Masum</div>
-        </div>
-        <div className="text-center">
-          <div className="font-mono text-base font-bold text-[#AAAAAA]">{evidenceDeck.length}</div>
-          <div className="font-mono text-xs text-[#8080A0] uppercase">Deste</div>
-        </div>
-      </div>
-
-      {/* Dedektif eli */}
+      {/* Dedektif eli — sıkıştırıldı */}
       {isHumanInspector && inspector.hand.length > 0 && (
-        <div className="p-4 border-b border-noir-border/30">
-          <div className="font-mono text-xs text-[#8080A0] tracking-widest uppercase mb-2">Elimdeki Kartlar</div>
-          <div className="flex flex-wrap gap-1.5">
+        <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
+          <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
+          <div className="flex flex-wrap gap-1">
             {inspector.hand.map((id) => (
-              <SuspectCard key={id} suspect={suspect(id)} size={44} showName={false} playerRole="inspector" />
+              <SuspectCard key={id} suspect={suspect(id)} size={38} showName={false} playerRole="inspector" />
             ))}
           </div>
         </div>
       )}
 
-      {/* Günlük (Mobilde Gizli) */}
-      <div className="hidden lg:flex flex-1 p-4 overflow-hidden flex-col min-h-0">
-        <div className="font-mono text-[10px] text-[#8080A0] tracking-widest uppercase mb-2">Olay Günlüğü</div>
-        <div className="flex-1 overflow-y-auto flex flex-col gap-1.5 pr-1">
+      {/* Olay Günlüğü — kalan tüm alan */}
+      <div className="hidden lg:flex flex-1 flex-col min-h-0 px-3 py-2 overflow-hidden">
+        <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Olay Günlüğü</div>
+        <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 pr-0.5"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
           {logs.map((log, i) => (
-            <div
-              key={i}
-              className={`font-mono text-xs leading-relaxed pb-1.5 border-b border-noir-border/20 ${
+            <div key={i}
+              className={`font-mono text-[11px] leading-relaxed py-1 px-1.5 rounded ${
                 i === 0
-                  ? 'text-[#E0DDD4] bg-noir-accent/5 px-2 py-1.5 rounded-lg border-noir-accent/20'
+                  ? 'text-[#E0DDD4] bg-noir-accent/5 border border-noir-accent/20'
                   : 'text-[#9A9890]'
               }`}
               dangerouslySetInnerHTML={{ __html: log }}
@@ -944,7 +926,7 @@ export default function GameScreen({ game, actions, onQuit }) {
       .filter(c => game.board.some(row => row[c] !== null));
   })();
 
-  const cellSize = useGridCellSize(activeRows.length, activeCols.length);
+  const { cellSize, panelWidth } = useGridAndPanelSize(activeRows.length, activeCols.length);
 
   return (
     <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
@@ -957,7 +939,7 @@ export default function GameScreen({ game, actions, onQuit }) {
           game={game}
           actions={actions}
           onQuit={onQuit}
-
+          panelWidth={panelWidth}
         />
       </div>
       <ExonerateOverlay game={game} actions={actions} />
