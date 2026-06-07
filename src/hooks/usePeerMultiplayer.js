@@ -86,7 +86,7 @@ export function usePeerMultiplayer() {
   logs: targetRole === 'inspector'
     ? game.logs.map(log => {
         // Dedektife gönderilirken katile özel log'ları maskele
-        if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
+        if (log.includes('Kimliğin:') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
           const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
           const eskiAd = eskiMatch ? eskiMatch[1] : '?';
           return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
@@ -173,7 +173,7 @@ export function usePeerMultiplayer() {
         ? roleState.logs.map(log => {
             if (log.includes('Gizli kimliğin'))
               return null;
-            if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
+            if (log.includes('Kimliğin:') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
               const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
               const eskiAd = eskiMatch ? eskiMatch[1] : '?';
               return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
