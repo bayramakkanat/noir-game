@@ -102,11 +102,11 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
 
   const realKillerId = game.killer.identitySuspectId;
   if (checkInspectorWinByArrest(targetSuspectId, realKillerId)) {
-    next = addLog(next, `🔍 Tutuklama başarılı: <b>${name}</b> katildi!`);
+    next = addLog(next, `🔗 Tutuklama başarılı: <b>${name}</b> katildi!`);
     return { ok: true, game: endGame(next, 'inspector') };
   }
 
-  next = addLog(next, `🔍 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
+  next = addLog(next, `🔗 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
   next = {
     ...next,
     inspector: {

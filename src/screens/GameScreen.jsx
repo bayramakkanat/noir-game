@@ -835,7 +835,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
                   className={`noir-action-btn nb-blue${pendingAction === 'arrest' ? ' nb-active' : ''}`}
                 >
                   <div className="nb-inner">
-                    <div className="nb-icon">🔍</div>
+                    <div className="nb-icon">🔗</div>
                     <div className="nb-text">
                       <span className="nb-title">Tutuklama</span>
                       <span className="nb-sub">{pendingAction === 'arrest' ? 'Tahtada bir karta tıkla' : 'Şüpheliyi tutuklat'}</span>
@@ -924,7 +924,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
         <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 pr-0.5"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
           {logs.map((log, i) => {
-            const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif');
+            const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif') || log.includes('🔗');
             const isKiller = log.includes('🗡️') || log.includes('⇄') || log.includes('Katil');
             const colorClass = isDetective ? 'text-blue-400' : isKiller ? 'text-red-400' : 'text-[#9A9890]';
             const sizeClass = "text-[12px] lg:text-[14px]";
@@ -963,7 +963,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
             </div>
             <div className="flex-1 overflow-y-auto flex flex-col gap-1 pr-1 pb-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
               {logs.map((log, i) => {
-                const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif');
+                const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif') || log.includes('🔗');
                 const isKiller = log.includes('🗡️') || log.includes('⇄') || log.includes('Katil');
                 const colorClass = isDetective ? 'text-blue-400' : isKiller ? 'text-red-400' : 'text-[#9A9890]';
                 return (
