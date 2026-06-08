@@ -50,12 +50,17 @@ export function useBgMusic(play) {
         resumeRef = () => {
           audio.play().then(() => {
             startFadeIn();
-          }).catch(() => {});
-          EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
-          eventsAdded = false;
+            if (eventsAdded) {
+              EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
+              eventsAdded = false;
+            }
+          }).catch(() => {
+            // Eğer Safari touchstart'ı geçerli saymazsa başarısız olur.
+            // Bu durumda dinleyiciler kalmaya devam eder, bir sonraki touchend veya click ile tekrar dener.
+          });
         };
 
-        EVENTS.forEach(e => window.addEventListener(e, resumeRef, { once: true, capture: true }));
+        EVENTS.forEach(e => window.addEventListener(e, resumeRef, { capture: true }));
         eventsAdded = true;
       });
     } else {
