@@ -622,7 +622,7 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
 }
 
 // ─── Exonerate overlay ────────────────────────────────────────────────────────
-function ExonerateOverlay({ game, actions }) {
+function ExonerateOverlay({ game, actions, cardSize = 74 }) {
   if (game.pendingAction !== 'exonerate' || !game.pendingExonerateDiscard) return null;
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50">
@@ -635,7 +635,7 @@ function ExonerateOverlay({ game, actions }) {
             const isDeceased = (game.killedSuspectIds ?? []).includes(id);
             return (
               <div key={id} className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => actions.completeExonerate(id)}>
-                <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" state={isDeceased ? 'eliminated' : 'normal'} />
+                <SuspectCard suspect={suspect(id)} size={cardSize} showName playerRole="inspector" state={isDeceased ? 'eliminated' : 'normal'} />
                 <div className="text-[10px] font-mono text-noir-muted group-hover:text-green-400 transition-colors tracking-widest uppercase">
                   {isDeceased ? 'At & El Yenile' : 'At & Temize Çıkar'}
                 </div>
@@ -1023,7 +1023,7 @@ export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
           isMultiplayer={isMultiplayer}
         />
       </div>
-      <ExonerateOverlay game={game} actions={actions} />
+      <ExonerateOverlay game={game} actions={actions} cardSize={cardSize} />
 
     </div>
   );
