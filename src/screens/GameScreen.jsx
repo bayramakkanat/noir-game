@@ -672,7 +672,7 @@ function ToastNotification({ logs }) {
           exit={{ opacity: 0, y: -20, scale: 0.9 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
           onClick={() => setDismissedIndex(latestIndex)}
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-[#1A1A24] text-[#E0DDD4] px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-noir-border/50 text-xs sm:text-sm font-mono max-w-[90vw] text-center cursor-pointer"
+          className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] bg-[#1A1A24] text-[#E0DDD4] px-6 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.8)] border border-noir-border/50 text-xs sm:text-sm font-mono max-w-[90vw] text-center cursor-pointer"
           dangerouslySetInnerHTML={{ __html: toast }}
         />
       )}
@@ -960,8 +960,9 @@ export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
     <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
       <style>{actionBtnStyles}</style>
       <div className="relative z-10 flex flex-1 flex-col lg:flex-row w-full min-h-0 min-w-0">
-        <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0">
+        <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0 relative">
           <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
+          <ToastNotification logs={game.logs} />
         </div>
         <ActionPanel
           game={game}
@@ -973,7 +974,6 @@ export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
         />
       </div>
       <ExonerateOverlay game={game} actions={actions} />
-      <ToastNotification logs={game.logs} />
 
     </div>
   );
