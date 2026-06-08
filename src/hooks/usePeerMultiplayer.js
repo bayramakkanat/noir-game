@@ -20,8 +20,30 @@ import {
   playArrestFailSound,
   playDisguiseSound,
 } from '../utils/audio.js';
-
 import { PHASE, TURN } from '../game/constants.js';
+
+// Katile özel log'ları dedektif için maskele
+function maskLogsForInspector(logs) {
+  return logs.map(log => {
+    if (log.includes('Kimliğin:') && log.includes('Komşunu öldür'))
+      return 'Oyun başladı. Katil ilk hamlesini yapıyor...'; // Katil kimlik bilgisi — gizle
+    if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin:')) {
+      const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
+      const eskiAd = eskiMatch ? eskiMatch[1] : '?';
+      return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
+    }
+    return log;
+  }).filter(Boolean);
+}
+
+// Dedektife özel log'ları katil için maskele
+function maskLogsForKiller(logs) {
+  return logs.map(log => {
+    if (log.includes('Gizli kimliğin:') && log.includes('Oyun başlıyor'))
+      return 'Dedektif kimliğini seçti. Oyun başlıyor.'; // Dedektif kimlik bilgisi — gizle
+    return log;
+  }).filter(Boolean);
+}
 
 export function usePeerMultiplayer() {
   const [roomId, setRoomId] = useState(null);
@@ -29,12 +51,11 @@ export function usePeerMultiplayer() {
   const [game, setGame] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState(null);
-  
+
   const peerRef = useRef(null);
   const connRef = useRef(null);
   const myRoleRef = useRef(null);
 
-  // Multiplayer aktifken ekranın kapanmasını önle
   const isConnected = status === 'playing';
   useWakeLock(isConnected);
 
@@ -43,225 +64,150 @@ export function usePeerMultiplayer() {
   }, [myRole]);
 
   const cleanup = useCallback(() => {
-    if (connRef.current) {
-      connRef.current.close();
-      connRef.current = null;
-    }
-    if (peerRef.current) {
-      peerRef.current.destroy();
-      peerRef.current = null;
-    }
+    if (connRef.current) { connRef.current.close(); connRef.current = null; }
+    if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null; }
   }, []);
 
-  // Oyuncunun sırası mı?
   const isMyTurn = useCallback((gameState) => {
     if (!gameState || !myRoleRef.current) return false;
     if (gameState.gameOver) return false;
-    
-    // Kimlik seçme aşamaları
-    if (gameState.phase === PHASE.KILLER_PICK_IDENTITY && myRoleRef.current === 'killer') return true;
-    if (gameState.phase === PHASE.KILLER_PICK_DISGUISE && myRoleRef.current === 'killer') return true;
-    if (gameState.phase === PHASE.INSPECTOR_PICK_IDENTITY && myRoleRef.current === 'inspector') return true;
-    
-    // İlk öldürme (sadece katil)
     if (gameState.phase === PHASE.KILLER_FIRST_KILL && myRoleRef.current === 'killer') return true;
-    
-    // Normal oyun
+    if (gameState.phase === PHASE.INSPECTOR_PICK_IDENTITY && myRoleRef.current === 'inspector') return true;
     if (gameState.phase === PHASE.PLAY) {
       if (gameState.turn === TURN.KILLER && myRoleRef.current === 'killer') return true;
       if (gameState.turn === TURN.INSPECTOR && myRoleRef.current === 'inspector') return true;
     }
-    
     return false;
   }, []);
 
-  // Game state serialization (gizli bilgiler olmadan)
-  // targetRole: kimin için serialize ediyoruz ('killer' veya 'inspector')
-  const serializeGameState = useCallback((game, targetRole = 'inspector') => ({
-  phase: game.phase,
-  turn: game.turn,
-  board: game.board,
-  publicExonerated: game.publicExonerated,
-  lastShift: game.lastShift,
-  logs: targetRole === 'inspector'
-    ? game.logs.map(log => {
-        // Dedektife gönderilirken katile özel log'ları maskele
-        if (log.includes('Kimliğin:') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
-          const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
-          const eskiAd = eskiMatch ? eskiMatch[1] : '?';
-          return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
-        }
-        if (log.includes('Gizli kimliğin')) return null;
-        return log;
-      }).filter(Boolean)
-    : game.logs.map(log => {
-        // Dedektifin gizli kimliğini katile gösterme
-        if (log.includes('Gizli kimliğin')) return null;
-        return log;
-      }).filter(Boolean), // Katile gönderilirken sadece inspector sırrını gizle
-  evidenceDeck: game.evidenceDeck,
-  discardPile: game.discardPile,
-  gameOver: game.gameOver,
-  winner: game.winner,
-  killCount: game.killCount,
-  killedSuspectIds: game.killedSuspectIds,
-  killSites: game.killSites,
-  killer: {
-    identitySuspectId: game.killer.identitySuspectId,        // 🔥 BU SATIRI EKLE
-    disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
-    hand: game.killer.hand,
-  },
-  inspector: {
-    secretIdentitySuspectId: game.inspector.secretIdentitySuspectId,
-    hand: game.inspector.hand,
-    investigated: game.inspector.investigated || [],
-  },
-}), []);
+  // Oyun state'ini serialize et — gizli bilgileri rolle filtrele
+  const serializeGameState = useCallback((game, targetRole) => ({
+    phase: game.phase,
+    turn: game.turn,
+    board: game.board,
+    publicExonerated: game.publicExonerated,
+    lastShift: game.lastShift,
+    evidenceDeck: game.evidenceDeck,
+    discardPile: game.discardPile,
+    gameOver: game.gameOver,
+    winner: game.winner,
+    killCount: game.killCount,
+    killedSuspectIds: game.killedSuspectIds,
+    killSites: game.killSites,
+    killer: {
+      // Katil kimliğini sadece dedektife gönder (arrest kontrolü için)
+      // ama katile kendi kimliğini gönderme (zaten biliyor, prev'den korunuyor)
+      identitySuspectId: game.killer.identitySuspectId,
+      disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
+      hand: game.killer.hand,
+    },
+    inspector: {
+      secretIdentitySuspectId: game.inspector.secretIdentitySuspectId,
+      hand: game.inspector.hand,
+      investigated: game.inspector.investigated || [],
+    },
+    // Log'ları role göre maskele
+    logs: targetRole === 'inspector'
+      ? maskLogsForInspector(game.logs)
+      : maskLogsForKiller(game.logs),
+  }), []);
 
-  // Hamleyi serialization
-  const serializeAction = useCallback((type, payload, newGameState) => ({
-    type,
-    payload,
-    // Dedektife gönderilecek state (inspector için filtreli)
-    newGameState: serializeGameState(newGameState, 'inspector'),
-    // Katile gönderilecek state (killer için filtresiz) — aynı aksiyon objesinde taşı
-    newGameStateForKiller: serializeGameState(newGameState, 'killer'),
-  }), [serializeGameState]);
-
-  // Hamle gönder
+  // Hamle gönder — her iki rol için ayrı serialize
   const sendAction = useCallback((type, payload, newGameState) => {
-    if (connRef.current && connRef.current.open) {
-      const actionData = serializeAction(type, payload, newGameState);
-      connRef.current.send({ type: 'action', data: actionData });
-      console.log('Hamle gönderildi:', type);
+    if (connRef.current?.open) {
+      connRef.current.send({
+        type: 'action',
+        data: {
+          type,
+          payload,
+          forInspector: serializeGameState(newGameState, 'inspector'),
+          forKiller: serializeGameState(newGameState, 'killer'),
+        }
+      });
     }
-  }, [serializeAction]);
+  }, [serializeGameState]);
 
   // Gelen veriyi işle
- const handleIncomingData = useCallback((data) => {
-  console.log('Gelen veri:', data.type);
-  
-  if (data.type === 'gameState') {
-    const role = myRoleRef.current;
-    const newGame = {
-      ...data.payload,
-      humanRole: role,
-      logs: role === 'inspector'
-        ? ['Oyun başladı. Katil kimliğini seçiyor, bekleniyor...']
-        : data.payload.logs,
-    };
-    setGame(newGame);
-    setStatus('playing');
-  } 
-  else if (data.type === 'action') {
-    const { type, payload, newGameState, newGameStateForKiller } = data.data;
-    console.log('Aksiyon geldi:', type, payload);
-    
-    setGame(prev => {
-      if (!prev) return prev;
+  const handleIncomingData = useCallback((data) => {
+    if (data.type === 'gameState') {
       const role = myRoleRef.current;
+      const payload = data.payload;
 
-      // Role göre doğru state'i seç:
-      // - Katil ise filtresiz newGameStateForKiller kullan (log'lar bozulmamış)
-      // - Dedektif ise filtrelenmiş newGameState kullan
-      const roleState = role === 'killer' && newGameStateForKiller
-        ? newGameStateForKiller
-        : newGameState;
+      // İlk log — katil için normal, dedektif için bekleme mesajı
+      const initialLog = role === 'inspector'
+        ? 'Oyun başladı. Katil ilk hamlesini yapıyor...'
+        : payload.logs?.[0] ?? 'Oyun başladı.';
 
-      // Dedektif için inspector'a özel log'ları maskele
-      const sanitizedLogs = role === 'inspector'
-        ? roleState.logs.map(log => {
-            if (log.includes('Gizli kimliğin'))
-              return null;
-            if (log.includes('Kimliğin:') || log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin')) {
-              const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
-              const eskiAd = eskiMatch ? eskiMatch[1] : '?';
-              return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
-            }
-            if (log.includes('Elindeki 2 karttan'))
-              return 'Katil kimliğini seçti. İlk hamle bekleniyor...';
-            return log;
-          }).filter(Boolean)
-        : roleState.logs; // Katil: log'lara dokunma
-
-      const updatedGame = {
-        ...roleState,
-        logs: sanitizedLogs,
-        killer: {
-          ...roleState.killer,
-          identitySuspectId:
-            role === 'killer'
-              ? prev.killer.identitySuspectId
-              : roleState.killer.identitySuspectId,
-        },
-        inspector: {
-          ...roleState.inspector,
-          secretIdentitySuspectId:
-            role === 'inspector'
-              ? prev.inspector.secretIdentitySuspectId
-              : roleState.inspector.secretIdentitySuspectId,
-        },
+      setGame({
+        ...payload,
         humanRole: role,
-      };
+        logs: [initialLog],
+      });
+      setStatus('playing');
+    }
+    else if (data.type === 'action') {
+      const { forInspector, forKiller } = data.data;
 
-      return updatedGame;
-    });
-  }
-}, []);
+      setGame(prev => {
+        if (!prev) return prev;
+        const role = myRoleRef.current;
+        const incoming = role === 'inspector' ? forInspector : forKiller;
+
+        return {
+          ...incoming,
+          // Kendi gizli kimliğini koru — karşı taraf null göndermiş olabilir
+          killer: {
+            ...incoming.killer,
+            identitySuspectId: role === 'killer'
+              ? prev.killer.identitySuspectId
+              : incoming.killer.identitySuspectId,
+          },
+          inspector: {
+            ...incoming.inspector,
+            secretIdentitySuspectId: role === 'inspector'
+              ? prev.inspector.secretIdentitySuspectId
+              : incoming.inspector.secretIdentitySuspectId,
+          },
+          humanRole: role,
+        };
+      });
+    }
+  }, []);
 
   // Oda oluştur (Katil)
   const createRoom = useCallback(async (roomName) => {
-    if (!roomName || roomName.trim() === '') {
-      setError('Lütfen bir oda adı girin');
-      return;
-    }
-
+    if (!roomName?.trim()) { setError('Lütfen bir oda adı girin'); return; }
     setError(null);
     setStatus('creating');
-    
+
     const peer = new Peer(roomName.trim());
     peerRef.current = peer;
 
     peer.on('open', () => {
-      console.log('Peer açıldı, ID:', peer.id);
       setRoomId(peer.id);
       setMyRole('killer');
       setStatus('waiting');
     });
 
     peer.on('connection', (conn) => {
-      console.log('Bağlantı geldi!');
       connRef.current = conn;
-      
       conn.on('open', () => {
-        console.log('Bağlantı açıldı, oyun başlatılıyor...');
-        // Oyunu başlat
         const initialGame = createClassicGame('killer');
         setGame({ ...initialGame, humanRole: 'killer' });
         setStatus('playing');
-        
-        // Dedektife oyun state'ini gönder (gizli bilgiler olmadan)
-        const serialized = serializeGameState(initialGame);
-        conn.send({ type: 'gameState', payload: serialized });
-        console.log('Oyun state\'i gönderildi');
+        // Dedektife gönder
+        conn.send({
+          type: 'gameState',
+          payload: serializeGameState(initialGame, 'inspector'),
+        });
       });
-      
       conn.on('data', handleIncomingData);
-      conn.on('close', () => {
-        console.log('Bağlantı kapandı');
-        setStatus('idle');
-        setError('Bağlantı koptu');
-        cleanup();
-      });
+      conn.on('close', () => { setStatus('idle'); setError('Bağlantı koptu'); cleanup(); });
     });
-    
+
     peer.on('error', (err) => {
-      console.error('Peer hatası:', err);
-      if (err.type === 'unavailable-id') {
-        setError('Bu oda adı zaten kullanılıyor. Başka bir ad deneyin.');
-      } else {
-        setError('Bağlantı hatası: ' + err.message);
-      }
+      if (err.type === 'unavailable-id') setError('Bu oda adı zaten kullanılıyor.');
+      else setError('Bağlantı hatası: ' + err.message);
       setStatus('idle');
       cleanup();
     });
@@ -269,82 +215,37 @@ export function usePeerMultiplayer() {
 
   // Odaya katıl (Dedektif)
   const joinRoom = useCallback(async (roomName) => {
-    if (!roomName || roomName.trim() === '') {
-      setError('Lütfen bir oda adı girin');
-      return;
-    }
-
+    if (!roomName?.trim()) { setError('Lütfen bir oda adı girin'); return; }
     setError(null);
     setStatus('joining');
-    
+
     const peer = new Peer();
     peerRef.current = peer;
 
     peer.on('open', () => {
-      console.log('Peer açıldı, bağlanılıyor...');
       const conn = peer.connect(roomName.trim());
       connRef.current = conn;
-      
-      conn.on('open', () => {
-        console.log('Bağlantı kuruldu!');
-        setRoomId(roomName);
-        setMyRole('inspector');
-        // State gelene kadar bekliyoruz
-      });
-      
+      conn.on('open', () => { setRoomId(roomName); setMyRole('inspector'); });
       conn.on('data', handleIncomingData);
-      conn.on('close', () => {
-        console.log('Bağlantı kapandı');
-        setStatus('idle');
-        setError('Bağlantı koptu');
-        cleanup();
-      });
+      conn.on('close', () => { setStatus('idle'); setError('Bağlantı koptu'); cleanup(); });
     });
-    
+
     peer.on('error', (err) => {
-      console.error('Peer hatası:', err);
       setError('Bağlantı hatası: ' + err.message);
       setStatus('idle');
       cleanup();
     });
   }, [cleanup, handleIncomingData]);
 
-  // ─── OYUNCU HAREKETLERİ ─────────────────────────────────────────
-
-  const pickKillerIdentity = useCallback((id) => {
-    setGame((prev) => {
-      if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyKillerPickIdentity(prev, id);
-      if (ok) {
-        playClickSound();
-        sendAction('pickKillerIdentity', id, next);
-        return next;
-      }
-      return prev;
-    });
-  }, [sendAction, isMyTurn]);
-
-  const pickInspectorIdentity = useCallback((id) => {
-    setGame((prev) => {
-      if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyInspectorPickIdentity(prev, id);
-      if (ok) {
-        playClickSound();
-        sendAction('pickInspectorIdentity', id, next);
-        return next;
-      }
-      return prev;
-    });
-  }, [sendAction, isMyTurn]);
+  // ─── Oyuncu hareketleri ───────────────────────────────────────────────────
 
   const executeBoardAction = useCallback((r, c) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev) || prev.gameOver) return prev;
-      
       const secrets = getActingSecrets(prev);
       const suspectId = prev.board[r]?.[c]?.suspectId;
       if (suspectId == null) return prev;
-      
+
       let result, actionType;
       if (prev.pendingAction === 'kill') {
         result = applyKill(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
@@ -358,40 +259,30 @@ export function usePeerMultiplayer() {
           else playArrestFailSound();
         }
       } else return prev;
-      
+
       if (!result?.ok) return prev;
-      
       sendAction(actionType, { suspectId, r, c }, result.game);
       return result.game;
     });
   }, [sendAction, isMyTurn]);
 
-  const beginShift = useCallback(() => {
-    setGame(g => g ? { ...g, pendingAction: 'shift', pendingShift: { step: 'axis' } } : g);
-  }, []);
-
-  const selectShiftLine = useCallback((axis, index) => {
-    setGame(g => g?.pendingAction === 'shift' ? { ...g, pendingShift: { step: 'direction', axis, index } } : g);
-  }, []);
-
-  const selectShiftDirection = useCallback((direction) => {
+  const pickInspectorIdentity = useCallback((id) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev)) return prev;
-      if (!prev.pendingShift || prev.pendingShift.step !== 'direction') return prev;
-      
-      const { axis, index } = prev.pendingShift;
-      const { ok, game: next } = applyShift(prev, axis, index, direction);
-      if (!ok) return prev;
-      
-      playShiftSound();
-      sendAction('shift', { axis, index, direction }, next);
-      return { ...next, pendingAction: null, pendingShift: null };
+      const { ok, game: next } = applyInspectorPickIdentity(prev, id);
+      if (ok) { playClickSound(); sendAction('pickInspectorIdentity', id, next); return next; }
+      return prev;
     });
   }, [sendAction, isMyTurn]);
 
-  const beginExonerate = useCallback(() => {
-    setGame(g => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g);
-  }, []);
+  const executeDisguise = useCallback(() => {
+    setGame((prev) => {
+      if (!prev || !isMyTurn(prev)) return prev;
+      const { ok, game: next } = applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId);
+      if (ok) { playDisguiseSound(); sendAction('disguise', null, next); return next; }
+      return prev;
+    });
+  }, [sendAction, isMyTurn]);
 
   const completeExonerate = useCallback((id) => {
     setGame((prev) => {
@@ -406,18 +297,30 @@ export function usePeerMultiplayer() {
     });
   }, [sendAction, isMyTurn]);
 
-  const executeDisguise = useCallback(() => {
+  const selectShiftDirection = useCallback((direction) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId);
-      if (ok) {
-        playDisguiseSound();
-        sendAction('disguise', null, next);
-        return next;
-      }
-      return prev;
+      if (!prev.pendingShift || prev.pendingShift.step !== 'direction') return prev;
+      const { axis, index } = prev.pendingShift;
+      const { ok, game: next } = applyShift(prev, axis, index, direction);
+      if (!ok) return prev;
+      playShiftSound();
+      sendAction('shift', { axis, index, direction }, next);
+      return { ...next, pendingAction: null, pendingShift: null };
     });
   }, [sendAction, isMyTurn]);
+
+  const beginShift = useCallback(() => {
+    setGame(g => g ? { ...g, pendingAction: 'shift', pendingShift: { step: 'axis' } } : g);
+  }, []);
+
+  const selectShiftLine = useCallback((axis, index) => {
+    setGame(g => g?.pendingAction === 'shift' ? { ...g, pendingShift: { step: 'direction', axis, index } } : g);
+  }, []);
+
+  const beginExonerate = useCallback(() => {
+    setGame(g => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g);
+  }, []);
 
   const setPending = useCallback((action) => {
     setGame(g => g ? { ...g, pendingAction: action, pendingShift: null } : g);
@@ -429,41 +332,21 @@ export function usePeerMultiplayer() {
 
   const leaveRoom = useCallback(() => {
     cleanup();
-    setRoomId(null);
-    setMyRole(null);
-    setGame(null);
-    setStatus('idle');
-    setError(null);
+    setRoomId(null); setMyRole(null); setGame(null); setStatus('idle'); setError(null);
   }, [cleanup]);
 
-  // Helper functions
-  const getActingSecretsWrapper = useCallback((gameState) => {
-    return getActingSecrets(gameState);
-  }, []);
-
-  const isCoordTargetableWrapper = useCallback((gameState, r, c, action, secrets) => {
-    return isCoordTargetable(gameState, r, c, action, secrets);
-  }, []);
+  const getActingSecretsWrapper = useCallback((gameState) => getActingSecrets(gameState), []);
+  const isCoordTargetableWrapper = useCallback((gameState, r, c, action, secrets) =>
+    isCoordTargetable(gameState, r, c, action, secrets), []);
 
   return {
-    roomId,
-    myRole,
-    game,
-    status,
-    error,
-    createRoom,
-    joinRoom,
-    leaveRoom,
-    setPending,
-    cancelPending,
-    beginShift,
-    selectShiftLine,
-    selectShiftDirection,
-    pickKillerIdentity,
+    roomId, myRole, game, status, error,
+    createRoom, joinRoom, leaveRoom,
+    setPending, cancelPending,
+    beginShift, selectShiftLine, selectShiftDirection,
     executeBoardAction,
     pickInspectorIdentity,
-    beginExonerate,
-    completeExonerate,
+    beginExonerate, completeExonerate,
     executeDisguise,
     getActingSecrets: getActingSecretsWrapper,
     isCoordTargetable: isCoordTargetableWrapper,

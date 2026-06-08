@@ -213,13 +213,17 @@ function ShiftOverlay({ lastShift, cellSize, activeRows, activeCols }) {
 }
 
 // ─── Dinamik grid boyutu ──────────────────────────────────────────────────────
-// Grid önce yüksekliği doldurur, kalan alan panele gider
-// Panel minimum 260px, maksimum 440px
-// Panel içeriği için gerçekçi sabit genişlik — grid tüm geri kalanı alır
-const PANEL_WIDTH = 400; // Masaüstü/laptop panel genişliği
+// Panel ve kart boyutu dinamik hesap:
+// 1) Ekran yüksekliğine göre kart boyutu belirlenir
+// 2) 3 kart + padding = panel genişliği
+// 3) Kalan alan grid'e gider
+const CARD_GAP = 8;
+const PANEL_PADDING = 40; // sol+sağ padding + scrollbar payı
+const PANEL_MIN = 340;
+const PANEL_MAX = 800;
 
 function useGridAndPanelSize(numRows, numCols) {
-  const [sizes, setSizes] = React.useState({ cellSize: 72, panelWidth: PANEL_WIDTH });
+  const [sizes, setSizes] = React.useState({ cellSize: 72, panelWidth: 420, cardSize: 74 });
 
   React.useEffect(() => {
     function calc() {
@@ -228,19 +232,29 @@ function useGridAndPanelSize(numRows, numCols) {
       const isDesktop = vw >= 1024;
 
       if (!isDesktop) {
-        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: window.innerWidth });
+        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: vw, cardSize: 64 });
         return;
       }
 
-      const GAP_RATIO = 0.055;
-      const MARGIN = 16;
+      // 1) Kart boyutu: ekran yüksekliğinin %12'si, min 70 max 130
+      // Bu sayede kartlar ve sağ panel daha geniş ve okunaklı olur
+      const cardSize = Math.min(130, Math.max(70, Math.round(vh * 0.12)));
 
-      // Panel sabit, grid tüm geri kalan alanı kullanır
-      const panelWidth = PANEL_WIDTH;
+      // 2) Panel genişliği: 4 kart yan yana + 3 gap + padding
+      //    Dedektif elinde 4 kart olabilir. Katil elinde daha az olsa bile, 
+      //    katil ve dedektif ekranlarının tam senkronize olması için 
+      //    her zaman 4 kartlık alana göre genişlik ayrılır.
+      const panelWidth = Math.min(
+        PANEL_MAX,
+        Math.max(PANEL_MIN, 4 * cardSize + 3 * CARD_GAP + PANEL_PADDING)
+      );
+
+      // 3) Grid kalan alanı kullanır
+      const GAP_RATIO = 0.055;
+      const MARGIN = 12;
       const gridAvailW = vw - panelWidth - MARGIN;
       const gridAvailH = vh - 8;
 
-      // Hem genişlikten hem yükseklikten hücre boyutunu hesapla, küçüğü al
       const gapFromW = Math.max(3, Math.round((gridAvailW / numCols) * GAP_RATIO));
       const cellFromW = Math.floor((gridAvailW - (numCols - 1) * gapFromW) / numCols);
 
@@ -249,7 +263,7 @@ function useGridAndPanelSize(numRows, numCols) {
 
       const cellSize = Math.max(60, Math.min(cellFromW, cellFromH));
 
-      setSizes({ cellSize, panelWidth });
+      setSizes({ cellSize, panelWidth, cardSize });
     }
 
     calc();
@@ -667,7 +681,7 @@ function ToastNotification({ logs }) {
 }
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
-function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
+function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, isMultiplayer }) {
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -722,7 +736,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
           <span className={`font-mono text-[10px] font-bold whitespace-nowrap ${
             humanCanAct ? 'text-yellow-400' : 'text-[#6A6A7A]'
           }`}>
-            {humanCanAct ? '● Senin turun' : activeSide === 'ai' ? '○ AI...' : '○ Bekle'}
+            {humanCanAct ? '● Senin turun' : isMultiplayer ? '○ Karşı Taraf...' : activeSide === 'ai' ? '○ AI...' : '○ Bekle'}
           </span>
           {onQuit && (
             <button onClick={onQuit} title="Ana Menü"
@@ -740,7 +754,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
       {/* Kimlik + istatistikler tek satırda */}
       {mySuspect && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex items-center gap-2.5 flex-shrink-0">
-          <SuspectCard suspect={mySuspect} size={44} showName={false} state="mine" playerRole={humanRole} />
+          <SuspectCard suspect={mySuspect} size={cardSize} showName={false} state="mine" playerRole={humanRole} />
           <div className="flex-1 min-w-0">
             <div className="font-body text-sm text-noir-text font-semibold truncate">{mySuspect.name}</div>
             <div className="font-mono text-[10px] text-[#8080A0]">{isHumanKiller ? 'Katil kimliği' : 'Gizli kimlik'}</div>
@@ -869,15 +883,11 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
         <div className="px-3 py-3 border-b border-noir-border/30 bg-blue-900/10 flex-shrink-0">
           <p className="font-mono text-[10px] text-blue-400 uppercase tracking-widest mb-0.5">Gizli Kimlik Seç</p>
           <p className="text-[11px] text-[#AAAAB0] mb-3">Aşağıdaki kartlardan birini seç.</p>
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center">
             {inspector.hand.map((id) => (
-              <div
-                key={id}
-                className="flex flex-col items-center cursor-pointer group"
-                onClick={() => actions.pickInspectorIdentity(id)}
-              >
+              <div key={id} className="flex flex-col items-center cursor-pointer group" onClick={() => actions.pickInspectorIdentity(id)}>
                 <div className="ring-2 ring-blue-500/60 group-hover:ring-blue-400 rounded-lg transition-all group-hover:scale-105">
-                  <SuspectCard suspect={suspect(id)} size={72} showName playerRole="inspector" state="normal" />
+                  <SuspectCard suspect={suspect(id)} size={cardSize} showName playerRole="inspector" state="normal" />
                 </div>
               </div>
             ))}
@@ -889,9 +899,9 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
       {isHumanInspector && inspector.hand.length > 0 && phase !== PHASE.INSPECTOR_PICK_IDENTITY && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
           <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-nowrap gap-1.5">
             {inspector.hand.map((id) => (
-              <SuspectCard key={id} suspect={suspect(id)} size={38} showName={false} playerRole="inspector" />
+              <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
             ))}
           </div>
         </div>
@@ -902,16 +912,23 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
         <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Olay Günlüğü</div>
         <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 pr-0.5"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
-          {logs.map((log, i) => (
-            <div key={i}
-              className={`font-mono text-[11px] leading-relaxed py-1 px-1.5 rounded ${
-                i === 0
-                  ? 'text-[#E0DDD4] bg-noir-accent/5 border border-noir-accent/20'
-                  : 'text-[#9A9890]'
-              }`}
-              dangerouslySetInnerHTML={{ __html: log }}
-            />
-          ))}
+          {logs.map((log, i) => {
+            const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif');
+            const isKiller = log.includes('🗡️') || log.includes('⇄') || log.includes('Katil');
+            const colorClass = isDetective ? 'text-blue-400' : isKiller ? 'text-red-400' : 'text-[#9A9890]';
+            const sizeClass = "text-[12px] lg:text-[14px]";
+
+            return (
+              <div key={i}
+                className={`font-mono ${sizeClass} leading-relaxed py-1.5 px-2 rounded ${
+                  i === 0
+                    ? `bg-noir-accent/10 border border-noir-accent/30 ${colorClass} font-semibold`
+                    : `${colorClass} opacity-80`
+                }`}
+                dangerouslySetInnerHTML={{ __html: log }}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -919,7 +936,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320 }) {
 }
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
-export default function GameScreen({ game, actions, onQuit }) {
+export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
   if (!game || !game.board) {
     return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
   }
@@ -937,7 +954,7 @@ export default function GameScreen({ game, actions, onQuit }) {
       .filter(c => game.board.some(row => row[c] !== null));
   })();
 
-  const { cellSize, panelWidth } = useGridAndPanelSize(activeRows.length, activeCols.length);
+  const { cellSize, panelWidth, cardSize } = useGridAndPanelSize(activeRows.length, activeCols.length);
 
   return (
     <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
@@ -951,6 +968,8 @@ export default function GameScreen({ game, actions, onQuit }) {
           actions={actions}
           onQuit={onQuit}
           panelWidth={panelWidth}
+          cardSize={cardSize}
+          isMultiplayer={isMultiplayer}
         />
       </div>
       <ExonerateOverlay game={game} actions={actions} />

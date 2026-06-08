@@ -23,6 +23,10 @@ export function useBgMusic(play) {
       fadeRef.current = null;
     }
 
+    let eventsAdded = false;
+    let resumeRef = null;
+    const EVENTS = ['touchstart', 'touchend', 'click', 'keydown', 'pointerdown'];
+
     if (play) {
       const startFadeIn = () => {
         const target = 0.5;
@@ -42,38 +46,42 @@ export function useBgMusic(play) {
       audio.play().then(() => {
         startFadeIn();
       }).catch(() => {
-        // Mobil dahil tüm etkileşim eventlerini dinle
-        const EVENTS = ['touchend', 'click', 'keydown', 'pointerdown'];
-
-        const resume = () => {
+        // Mobil dahil tüm etkileşim eventlerini dinle (capture phase)
+        resumeRef = () => {
           audio.play().then(() => {
             startFadeIn();
           }).catch(() => {});
-          EVENTS.forEach(e => window.removeEventListener(e, resume));
+          EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
+          eventsAdded = false;
         };
 
-        EVENTS.forEach(e => window.addEventListener(e, resume, { once: true }));
+        EVENTS.forEach(e => window.addEventListener(e, resumeRef, { once: true, capture: true }));
+        eventsAdded = true;
       });
     } else {
       const step = audio.volume / 20;
-      if (step === 0) return;
-      fadeRef.current = setInterval(() => {
-        if (audio.volume - step <= 0) {
-          audio.volume = 0;
-          audio.pause();
-          audio.currentTime = 0;
-          clearInterval(fadeRef.current);
-          fadeRef.current = null;
-        } else {
-          audio.volume -= step;
-        }
-      }, 50);
+      if (step > 0) {
+        fadeRef.current = setInterval(() => {
+          if (audio.volume - step <= 0) {
+            audio.volume = 0;
+            audio.pause();
+            audio.currentTime = 0;
+            clearInterval(fadeRef.current);
+            fadeRef.current = null;
+          } else {
+            audio.volume -= step;
+          }
+        }, 50);
+      }
     }
 
     return () => {
       if (fadeRef.current) {
         clearInterval(fadeRef.current);
         fadeRef.current = null;
+      }
+      if (eventsAdded && resumeRef) {
+        EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
       }
     };
   }, [play]);

@@ -82,7 +82,7 @@ function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageSc
   );
 }
 
-function MainMenu({ onSelect }) {
+function MainMenu({ onSelect, isMuted, onToggleMute }) {
   const [rulesOpen, setRulesOpen] = useState(false);
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
@@ -101,15 +101,25 @@ function MainMenu({ onSelect }) {
       <div className="absolute bottom-0 left-0 right-0 h-72 bg-gradient-to-t from-[#07070F] to-transparent z-[2] pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#07070F]/60 to-transparent z-[2] pointer-events-none" />
 
-      {/* Sağ üst: Sadece tam ekran butonu — SetupScreen ile aynı stil */}
-      <button
-        type="button"
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
-        className="absolute top-5 right-5 z-10 w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
-      >
-        ⛶
-      </button>
+      {/* Sağ üst: Ses ve Tam ekran butonları */}
+      <div className="absolute top-5 right-5 z-10 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleMute}
+          title={isMuted ? 'Müziği aç' : 'Müziği kapat'}
+          className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
+        >
+          {isMuted ? '🔇' : '🔊'}
+        </button>
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'Tam ekrandan çık' : 'Tam ekran'}
+          className="w-9 h-9 rounded-full border border-white/15 bg-black/30 text-white/50 hover:text-noir-accent hover:border-noir-accent/40 font-mono text-sm backdrop-blur-sm transition-colors flex items-center justify-center"
+        >
+          ⛶
+        </button>
+      </div>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
         <div className="text-center mb-10 sm:mb-12 anim-fade-in">
@@ -184,16 +194,17 @@ function MainMenu({ onSelect }) {
 
 export default function App() {
   const [mode, setMode] = useState('menu');
+  const [isMuted, setIsMuted] = useState(false);
   const solo = useGameState();
   const multi = usePeerMultiplayer();
 
   // Oyun ekranında (aktif oyun varken) muzik durur, diger tum ekranlarda calar
   const soloInGame  = mode === 'solo'  && !!solo.game  && !solo.game.gameOver;
   const multiInGame = mode === 'multi' && !!multi.game && !multi.game.gameOver && multi.status === 'playing';
-  useBgMusic(!soloInGame && !multiInGame);
+  useBgMusic(!soloInGame && !multiInGame && !isMuted);
 
   if (mode === 'menu') {
-    return <div className="grain"><MainMenu onSelect={setMode} /></div>;
+    return <div className="grain"><MainMenu onSelect={setMode} isMuted={isMuted} onToggleMute={() => setIsMuted(!isMuted)} /></div>;
   }
 
   if (mode === 'solo') {
