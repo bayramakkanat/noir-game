@@ -682,6 +682,7 @@ function ToastNotification({ logs }) {
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
 function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, isMultiplayer }) {
+  const [showMobileLog, setShowMobileLog] = React.useState(false);
   const {
     phase, turn, humanRole, activeSide,
     killer, inspector, publicExonerated, evidenceDeck,
@@ -899,10 +900,20 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
       {isHumanInspector && inspector.hand.length > 0 && phase !== PHASE.INSPECTOR_PICK_IDENTITY && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
           <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
-          <div className="flex flex-nowrap gap-1.5">
-            {inspector.hand.map((id) => (
-              <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
-            ))}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-nowrap gap-1.5">
+              {inspector.hand.map((id) => (
+                <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
+              ))}
+            </div>
+            {/* Olay Günlüğü Mobilde Açma Butonu */}
+            <button
+              onClick={() => setShowMobileLog(true)}
+              className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all ml-2"
+              title="Olay Günlüğü"
+            >
+              🔍
+            </button>
           </div>
         </div>
       )}
@@ -931,6 +942,45 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
           })}
         </div>
       </div>
+
+      {/* Mobil Olay Günlüğü Overlay */}
+      <AnimatePresence>
+        {showMobileLog && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="lg:hidden absolute inset-0 z-50 bg-[#09090F] flex flex-col p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]"
+          >
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <div className="font-mono text-[11px] text-[#8080A0] tracking-widest uppercase">Olay Günlüğü</div>
+              <button
+                onClick={() => setShowMobileLog(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-white/80 hover:text-white hover:bg-white/20 active:scale-95 transition-all"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto flex flex-col gap-1 pr-1 pb-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
+              {logs.map((log, i) => {
+                const isDetective = log.includes('🔍') || log.includes('✓') || log.includes('↺') || log.includes('Dedektif');
+                const isKiller = log.includes('🗡️') || log.includes('⇄') || log.includes('Katil');
+                const colorClass = isDetective ? 'text-blue-400' : isKiller ? 'text-red-400' : 'text-[#9A9890]';
+                return (
+                  <div key={i}
+                    className={`font-mono text-[13px] leading-relaxed py-2 px-2.5 rounded ${
+                      i === 0
+                        ? `bg-noir-accent/10 border border-noir-accent/30 ${colorClass} font-semibold`
+                        : `${colorClass} opacity-80`
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: log }}
+                  />
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
