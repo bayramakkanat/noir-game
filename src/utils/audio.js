@@ -1,6 +1,15 @@
 // Web Audio API kullanarak dışarıdan dosya indirmeden ses efektleri oluşturma
 let audioCtx = null;
 
+// İlk kullanıcı etkileşiminde AudioContext'i proaktif başlat (Firefox/Zen için)
+function initAudioOnInteraction() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+}
+document.addEventListener('click', initAudioOnInteraction, { once: true });
+document.addEventListener('keydown', initAudioOnInteraction, { once: true });
+
 async function getAudioCtx() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
