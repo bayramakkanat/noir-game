@@ -1,16 +1,18 @@
 // Web Audio API kullanarak dışarıdan dosya indirmeden ses efektleri oluşturma
 let audioCtx = null;
 
-function getAudioCtx() {
+async function getAudioCtx() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
   return audioCtx;
 }
 
-export function playClickSound() {
-  const ctx = getAudioCtx();
+export async function playClickSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
 
@@ -28,8 +30,8 @@ export function playClickSound() {
   osc.stop(ctx.currentTime + 0.05);
 }
 
-export function playShiftSound() {
-  const ctx = getAudioCtx();
+export async function playShiftSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
   const filter = ctx.createBiquadFilter();
@@ -53,8 +55,8 @@ export function playShiftSound() {
   osc.stop(ctx.currentTime + 0.3);
 }
 
-export function playKillSound() {
-  const ctx = getAudioCtx();
+export async function playKillSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
   const filter = ctx.createBiquadFilter();
@@ -78,8 +80,8 @@ export function playKillSound() {
   osc.stop(ctx.currentTime + 0.4);
 }
 
-export function playArrestSuccessSound() {
-  const ctx = getAudioCtx();
+export async function playArrestSuccessSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
 
@@ -100,8 +102,8 @@ export function playArrestSuccessSound() {
   osc.stop(ctx.currentTime + 0.6);
 }
 
-export function playArrestFailSound() {
-  const ctx = getAudioCtx();
+export async function playArrestFailSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
 
@@ -119,8 +121,8 @@ export function playArrestFailSound() {
   osc.stop(ctx.currentTime + 0.3);
 }
 
-export function playDisguiseSound() {
-  const ctx = getAudioCtx();
+export async function playDisguiseSound() {
+  const ctx = await getAudioCtx();
   const osc = ctx.createOscillator();
   const gainNode = ctx.createGain();
   const filter = ctx.createBiquadFilter();
