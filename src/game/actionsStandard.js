@@ -99,8 +99,6 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     killedSuspectIds: [...(game.killedSuspectIds ?? []), suspectId],
     killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
     publicExonerated: (game.publicExonerated ?? []).filter(id => id !== suspectId),
-    // Öldürülen suspect desteden de çıkarılır — Inspector eline gelemesin
-    evidenceDeck: game.evidenceDeck.filter(id => id !== suspectId),
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
@@ -136,7 +134,7 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
         isAdjacent: inspectorIsAdjacent,
       },
     };
-    next = addLog(next, `📍 Canvas: Dedektif, kimliğinin <b>${suspectName(suspectId)}</b>'a komşu olup olmadığını açıklamalı.`);
+    next = addLog(next, `📍 Dedektif kimliğinin <b>${suspectName(suspectId)}</b>'a komşu olup olmadığı sorgulandı.`);
     next = advanceTurn(next);
     return { ok: true, game: next };
   }
@@ -239,7 +237,7 @@ export function applyStandardExonerate(game, discardFromHandId, killerIdentityId
         isAdjacent: killerIsAdjacent,
       },
     };
-    next = addLog(next, `✓ Temize çıkarıldı: <b>${suspectName(discardFromHandId)}</b>. 📍 Canvas: Katil, kimliğinin <b>${suspectName(discardFromHandId)}</b>'a komşu olup olmadığını açıklamalı.`);
+    next = addLog(next, `✓ Temize çıkarıldı: <b>${suspectName(discardFromHandId)}</b>. 📍 Katil kimliğinin <b>${suspectName(discardFromHandId)}</b>'a komşu olup olmadığı sorgulandı.`);
   }
 
   next = advanceTurn(next);

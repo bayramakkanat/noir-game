@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWakeLock } from './useWakeLock.js';
 import { Peer } from 'peerjs';
 import { createClassicGame } from '../game/setup.js';
+import { createStandardGame } from '../game/setupStandard.js';
 import { getActingSecrets } from '../game/setup.js';
 import { isCoordTargetable } from '../game/validators.js';
 import {
@@ -12,6 +13,16 @@ import {
   applyShift,
   applyInspectorPickIdentity,
 } from '../game/actions.js';
+import {
+  applyStandardKill,
+  applyStandardAccuse,
+  applyStandardExonerate,
+  applyStandardDisguise,
+  applyStandardShift,
+  applyStandardInspectorPickIdentity,
+  applyStandardSolve,
+  clearCanvas
+} from '../game/actionsStandard.js';
 import {
   playClickSound,
   playShiftSound,
@@ -25,12 +36,14 @@ import { PHASE, TURN } from '../game/constants.js';
 // Katile özel log'ları dedektif için maskele
 function maskLogsForInspector(logs) {
   return logs.map(log => {
-    if (log.includes('Kimliğin:') && log.includes('Komşunu öldür'))
+    if (log.includes('Kimliğin:') && log.toLowerCase().includes('omşunu öldür'))
       return 'Oyun başladı. Katil ilk hamlesini yapıyor...'; // Katil kimlik bilgisi — gizle
     if (log.includes('Kılık değiştirdin') || log.includes('Yeni kimliğin:')) {
       const eskiMatch = log.match(/Eski kimlik \(<b>([^<]+)<\/b>\)/);
-      const eskiAd = eskiMatch ? eskiMatch[1] : '?';
-      return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiAd}</b>.`;
+      if (eskiMatch) {
+        return `⇄ Katil kılık değiştirdi. Eski kimlik: <b>${eskiMatch[1]}</b>.`;
+      }
+      return `⇄ Katil kılık değiştirdi.`;
     }
     return log;
   }).filter(Boolean);
@@ -94,11 +107,17 @@ export function usePeerMultiplayer() {
     killCount: game.killCount,
     killedSuspectIds: game.killedSuspectIds,
     killSites: game.killSites,
+    gameMode: game.gameMode,
+    positiveInspectorCanvases: game.positiveInspectorCanvases,
+    positiveKillerCanvases: game.positiveKillerCanvases,
+    pendingCanvas: game.pendingCanvas,
+    solveGuess: game.solveGuess,
     killer: {
       // Katil kimliğini sadece dedektife gönder (arrest kontrolü için)
       // ama katile kendi kimliğini gönderme (zaten biliyor, prev'den korunuyor)
       identitySuspectId: game.killer.identitySuspectId,
       disguiseCardSuspectId: game.killer.disguiseCardSuspectId,
+      disguiseSuspectId: game.killer.disguiseSuspectId,
       hand: game.killer.hand,
     },
     inspector: {
@@ -161,6 +180,12 @@ export function usePeerMultiplayer() {
             identitySuspectId: role === 'killer'
               ? prev.killer.identitySuspectId
               : incoming.killer.identitySuspectId,
+            disguiseCardSuspectId: role === 'killer'
+              ? prev.killer.disguiseCardSuspectId
+              : incoming.killer.disguiseCardSuspectId,
+            disguiseSuspectId: role === 'killer'
+              ? prev.killer.disguiseSuspectId
+              : incoming.killer.disguiseSuspectId,
           },
           inspector: {
             ...incoming.inspector,
@@ -175,7 +200,7 @@ export function usePeerMultiplayer() {
   }, []);
 
   // Oda oluştur (Katil)
-  const createRoom = useCallback(async (roomName) => {
+  const createRoom = useCallback(async (roomName, gameMode) => {
     if (!roomName?.trim()) { setError('Lütfen bir oda adı girin'); return; }
     setError(null);
     setStatus('creating');
@@ -192,7 +217,7 @@ export function usePeerMultiplayer() {
     peer.on('connection', (conn) => {
       connRef.current = conn;
       conn.on('open', () => {
-        const initialGame = createClassicGame('killer');
+        const initialGame = gameMode === 'standard' ? createStandardGame('killer') : createClassicGame('killer');
         setGame({ ...initialGame, humanRole: 'killer' });
         setStatus('playing');
         // Dedektife gönder
@@ -247,17 +272,28 @@ export function usePeerMultiplayer() {
       if (suspectId == null) return prev;
 
       let result, actionType;
+      const isStandard = prev.gameMode === 'standard';
+
       if (prev.pendingAction === 'kill') {
-        result = applyKill(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        const fn = isStandard ? applyStandardKill : applyKill;
+        result = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         actionType = 'kill';
         if (result.ok) playKillSound();
       } else if (prev.pendingAction === 'arrest') {
-        result = applyArrest(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        const fn = isStandard ? applyStandardAccuse : applyArrest;
+        result = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         actionType = 'arrest';
         if (result.ok) {
           if (result.game.gameOver && result.game.winner === 'inspector') playArrestSuccessSound();
           else playArrestFailSound();
         }
+      } else if (prev.pendingAction === 'solve_identity') {
+        return { ...prev, pendingAction: 'solve_disguise', solveGuess: { identityId: suspectId } };
+      } else if (prev.pendingAction === 'solve_disguise') {
+        if (suspectId === prev.solveGuess?.identityId) return prev;
+        result = applyStandardSolve(prev, prev.solveGuess.identityId, suspectId);
+        actionType = 'solve';
+        if (result.ok) playClickSound();
       } else return prev;
 
       if (!result?.ok) return prev;
@@ -269,7 +305,9 @@ export function usePeerMultiplayer() {
   const pickInspectorIdentity = useCallback((id) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyInspectorPickIdentity(prev, id);
+      const isStandard = prev.gameMode === 'standard';
+      const fn = isStandard ? applyStandardInspectorPickIdentity : applyInspectorPickIdentity;
+      const { ok, game: next } = fn(prev, id);
       if (ok) { playClickSound(); sendAction('pickInspectorIdentity', id, next); return next; }
       return prev;
     });
@@ -278,7 +316,10 @@ export function usePeerMultiplayer() {
   const executeDisguise = useCallback(() => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId);
+      const isStandard = prev.gameMode === 'standard';
+      const { ok, game: next } = isStandard
+        ? applyStandardDisguise(prev)
+        : applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId);
       if (ok) { playDisguiseSound(); sendAction('disguise', null, next); return next; }
       return prev;
     });
@@ -287,7 +328,11 @@ export function usePeerMultiplayer() {
   const completeExonerate = useCallback((id) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev)) return prev;
-      const { ok, game: next } = applyExonerate(prev, id);
+      const isStandard = prev.gameMode === 'standard';
+      const secrets = getActingSecrets(prev);
+      const { ok, game: next } = isStandard
+        ? applyStandardExonerate(prev, id, secrets.killerIdentityId)
+        : applyExonerate(prev, id);
       if (ok) {
         playClickSound();
         sendAction('exonerate', { id }, next);
@@ -302,7 +347,9 @@ export function usePeerMultiplayer() {
       if (!prev || !isMyTurn(prev)) return prev;
       if (!prev.pendingShift || prev.pendingShift.step !== 'direction') return prev;
       const { axis, index } = prev.pendingShift;
-      const { ok, game: next } = applyShift(prev, axis, index, direction);
+      const isStandard = prev.gameMode === 'standard';
+      const fn = isStandard ? applyStandardShift : applyShift;
+      const { ok, game: next } = fn(prev, axis, index, direction);
       if (!ok) return prev;
       playShiftSound();
       sendAction('shift', { axis, index, direction }, next);
@@ -321,6 +368,19 @@ export function usePeerMultiplayer() {
   const beginExonerate = useCallback(() => {
     setGame(g => g ? { ...g, pendingAction: 'exonerate', pendingExonerateDiscard: true } : g);
   }, []);
+
+  const beginSolve = useCallback(() => {
+    setGame(g => g ? { ...g, pendingAction: 'solve_identity', solveGuess: {} } : g);
+  }, []);
+
+  const executeSolve = useCallback((guessIdentityId, guessDisguiseId) => {
+    setGame((prev) => {
+      if (!prev || !isMyTurn(prev)) return prev;
+      const { ok, game: next } = applyStandardSolve(prev, guessIdentityId, guessDisguiseId);
+      if (ok) { playClickSound(); sendAction('solve', { guessIdentityId, guessDisguiseId }, next); return next; }
+      return prev;
+    });
+  }, [sendAction, isMyTurn]);
 
   const setPending = useCallback((action) => {
     setGame(g => g ? { ...g, pendingAction: action, pendingShift: null } : g);
@@ -348,6 +408,7 @@ export function usePeerMultiplayer() {
     pickInspectorIdentity,
     beginExonerate, completeExonerate,
     executeDisguise,
+    beginSolve, executeSolve,
     getActingSecrets: getActingSecretsWrapper,
     isCoordTargetable: isCoordTargetableWrapper,
     runAiTurn: () => {},

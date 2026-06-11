@@ -289,7 +289,7 @@ export default function App() {
             status={multi.status}
             error={multi.error}
             roomId={multi.roomId}
-            onCreateRoom={(name) => multi.createRoom(name ?? 'oda')}
+            onCreateRoom={(name) => multi.createRoom(name ?? 'oda', globalGameMode)}
             onJoinRoom={(name) => multi.joinRoom(name)}
             onBack={() => { multi.leaveRoom(); setMode('menu'); }}
           />
@@ -313,6 +313,8 @@ export default function App() {
             beginExonerate: multi.beginExonerate,
             completeExonerate: multi.completeExonerate,
             executeDisguise: multi.executeDisguise,
+            beginSolve: multi.beginSolve,
+            executeSolve: multi.executeSolve,
             runAiTurn: multi.runAiTurn,
             getActingSecrets: multi.getActingSecrets,
             isCoordTargetable: multi.isCoordTargetable,
