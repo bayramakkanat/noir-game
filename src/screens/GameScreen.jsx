@@ -1145,27 +1145,30 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
         </div>
       )}
 
-      {/* Dedektif eli — kimlik seçme fazı dışında küçük göster */}
+      {/* Dedektif eli — kimlik seçme fazı dışında */}
       {isHumanInspector && inspector.hand.length > 0 && phase !== PHASE.INSPECTOR_PICK_IDENTITY && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
           <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
-          <div className="flex items-center justify-between">
-            <div className="flex flex-nowrap gap-1.5">
-              {inspector.hand.map((id) => (
-                <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
-              ))}
-            </div>
-            {/* Olay Günlüğü Mobilde Açma Butonu */}
-            <button
-              onClick={() => setShowMobileLog(true)}
-              className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all ml-2"
-              title="Olay Günlüğü"
-            >
-              🔍
-            </button>
+          <div className="flex flex-nowrap gap-1.5">
+            {inspector.hand.map((id) => (
+              <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
+            ))}
           </div>
         </div>
       )}
+
+      {/* Olay Günlüğü mobil butonu — katil ve dedektif, her iki rol için */}
+      <div className="lg:hidden px-3 py-2 border-b border-noir-border/30 flex items-center justify-between flex-shrink-0">
+        <span className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase">Olay Günlüğü</span>
+        <button
+          onClick={() => setShowMobileLog(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+          title="Olay Günlüğü"
+        >
+          <span className="text-base">🔍</span>
+          <span className="font-mono text-[10px] tracking-wide">{logs[0] ? logs.length + ' kayıt' : 'Boş'}</span>
+        </button>
+      </div>
 
       {/* Olay Günlüğü — kalan tüm alan */}
       <div className="hidden lg:flex flex-1 flex-col min-h-0 px-3 py-2 overflow-hidden">
@@ -1256,7 +1259,7 @@ export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
   const { cellSize, panelWidth, cardSize } = useGridAndPanelSize(activeRows.length, activeCols.length);
 
   return (
-    <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[50vh] lg:pb-0 overflow-hidden bg-[#09090F]">
+    <div className="relative h-[100dvh] w-full flex flex-col lg:flex-row pb-[46vh] lg:pb-0 overflow-hidden bg-[#09090F]">
       <style>{actionBtnStyles}</style>
       <div className="relative z-10 flex flex-1 flex-col lg:flex-row w-full min-h-0 min-w-0">
         <div className="flex-1 flex items-center justify-center px-2 lg:px-4 pt-1 min-h-0 relative">
