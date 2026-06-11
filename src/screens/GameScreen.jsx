@@ -1149,26 +1149,39 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
       {isHumanInspector && inspector.hand.length > 0 && phase !== PHASE.INSPECTOR_PICK_IDENTITY && (
         <div className="px-3 py-2 border-b border-noir-border/30 flex-shrink-0">
           <div className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase mb-1.5">Elimdeki Kartlar</div>
-          <div className="flex flex-nowrap gap-1.5">
-            {inspector.hand.map((id) => (
-              <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
-            ))}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-nowrap gap-1.5">
+              {inspector.hand.map((id) => (
+                <SuspectCard key={id} suspect={suspect(id)} size={cardSize} showName={false} playerRole="inspector" />
+              ))}
+            </div>
+            {/* Olay Günlüğü butonu — sadece mobil, boş sağ alana */}
+            <button
+              onClick={() => setShowMobileLog(true)}
+              className="lg:hidden flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all ml-2 flex-shrink-0"
+              title="Olay Günlüğü"
+            >
+              <span className="text-sm">🔍</span>
+              <span className="font-mono text-[9px] tracking-wide">{logs.length}</span>
+            </button>
           </div>
         </div>
       )}
 
-      {/* Olay Günlüğü mobil butonu — katil ve dedektif, her iki rol için */}
-      <div className="lg:hidden px-3 py-2 border-b border-noir-border/30 flex items-center justify-between flex-shrink-0">
-        <span className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase">Olay Günlüğü</span>
-        <button
-          onClick={() => setShowMobileLog(true)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
-          title="Olay Günlüğü"
-        >
-          <span className="text-base">🔍</span>
-          <span className="font-mono text-[10px] tracking-wide">{logs[0] ? logs.length + ' kayıt' : 'Boş'}</span>
-        </button>
-      </div>
+      {/* Katil için ayrı olay günlüğü butonu satırı — sadece mobil */}
+      {isHumanKiller && (
+        <div className="lg:hidden px-3 py-2 border-b border-noir-border/30 flex items-center justify-between flex-shrink-0">
+          <span className="font-mono text-[9px] text-[#8080A0] tracking-widest uppercase">Olay Günlüğü</span>
+          <button
+            onClick={() => setShowMobileLog(true)}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
+            title="Olay Günlüğü"
+          >
+            <span className="text-sm">🔍</span>
+            <span className="font-mono text-[9px] tracking-wide">{logs.length} kayıt</span>
+          </button>
+        </div>
+      )}
 
       {/* Olay Günlüğü — kalan tüm alan */}
       <div className="hidden lg:flex flex-1 flex-col min-h-0 px-3 py-2 overflow-hidden">

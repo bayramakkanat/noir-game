@@ -33,13 +33,19 @@ function endGame(game, winner) {
 
 function advanceTurn(game) {
   if (game.phase === PHASE.KILLER_FIRST_KILL) {
-    // Katil ilk öldürmesini yaptı — ŞIMDI Inspector 4 kart çeker
-    // Böylece öldürülen karakter asla Inspector'ın eline gelmez
-    const { drawn, remaining } = drawCards(game.evidenceDeck, INSPECTOR_HAND_SIZE);
+    const killedIds = new Set(game.killedSuspectIds ?? []);
+    let deck = game.evidenceDeck;
+    const hand = [];
+    // Döngüyle 4 canlı kart çekene kadar devam et
+    while (hand.length < INSPECTOR_HAND_SIZE && deck.length > 0) {
+      const { drawn, remaining } = drawCards(deck, 1);
+      deck = remaining;
+      if (!killedIds.has(drawn[0])) hand.push(drawn[0]);
+    }
     return {
       ...game,
-      evidenceDeck: remaining,
-      inspector: { ...game.inspector, hand: drawn },
+      evidenceDeck: deck,
+      inspector: { ...game.inspector, hand },
       phase: PHASE.INSPECTOR_PICK_IDENTITY,
       activeSide: game.humanRole === 'inspector' ? 'human' : 'ai',
     };
@@ -93,6 +99,8 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     killedSuspectIds: [...(game.killedSuspectIds ?? []), suspectId],
     killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
     publicExonerated: (game.publicExonerated ?? []).filter(id => id !== suspectId),
+    // Öldürülen suspect desteden de çıkarılır — Inspector eline gelemesin
+    evidenceDeck: game.evidenceDeck.filter(id => id !== suspectId),
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
