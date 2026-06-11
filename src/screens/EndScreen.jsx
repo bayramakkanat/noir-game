@@ -58,6 +58,16 @@ function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp =
             </div>
           </div>
         )}
+        {stamp === 'wrong_solve' && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="border-4 border-[#8B5CF6] text-[#8B5CF6] font-display font-black tracking-widest px-2 py-1 rotate-[-18deg] opacity-90 text-base"
+              style={{ textShadow: '0 0 8px #8B5CF688' }}
+            >
+              YANLIŞ TAHMİN
+            </div>
+          </div>
+        )}
         {stamp === 'escaped' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div
@@ -85,15 +95,20 @@ export default function EndScreen({ game, onReset }) {
   const isInspector    = game.humanRole === 'inspector';
   const playerWon      = (isKiller && killerWon) || (isInspector && inspectorWon);
 
-  const killerSuspect  = SUSPECTS[game.killer.identitySuspectId];
-  const inspectorSuspect = SUSPECTS[game.inspector.secretIdentitySuspectId];
+  const killerSuspect     = SUSPECTS.find(s => s.id === game.killer.identitySuspectId);
+  const inspectorSuspect  = SUSPECTS.find(s => s.id === game.inspector.secretIdentitySuspectId);
 
   // Öldürülenler (son 4 tane, fazlası olursa) — tahtadan kaldırılmış satır/sütunlar dahil
   const deceasedSuspects = (game.killedSuspectIds ?? [])
-    .map(id => SUSPECTS[id])
+    .map(id => SUSPECTS.find(s => s.id === id))
     .filter(Boolean)
     .filter(s => s.id !== killerSuspect?.id && s.id !== inspectorSuspect?.id)
     .slice(-4);
+
+  const isStandard = game.gameMode === 'standard';
+  const disguiseSuspect = isStandard
+    ? SUSPECTS.find(s => s.id === game.killer.disguiseSuspectId)
+    : null;
 
   // Tema renkleri
   const accentColor  = killerWon ? '#C0392B' : '#4090C8';
@@ -108,10 +123,27 @@ export default function EndScreen({ game, onReset }) {
     : (killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI');
 
   const subtext = (() => {
+    if (isStandard) {
+      const winReason = game.winReason;
+      if (isInspector && inspectorWon && winReason === 'solve')
+        return `${killerSuspect?.name} ve kılığı ${disguiseSuspect?.name} doğru tahmin edildi.`;
+      if (isInspector && inspectorWon && winReason === 'arrest')
+        return `${killerSuspect?.name} suçüstü yakalandı.`;
+      if (isInspector && inspectorWon)
+        return `${killerSuspect?.name} yakalandı.`;
+      if (isInspector && killerWon)
+        return `Yanlış tahmin. Katil: ${killerSuspect?.name}, Kılık: ${disguiseSuspect?.name}.`;
+      if (isKiller && killerWon)
+        return `Kimliğin ${killerSuspect?.name}, kılığın ${disguiseSuspect?.name}. İkisi de gizli kaldı.`;
+      if (isKiller && inspectorWon && winReason === 'solve')
+        return `Dedektif hem kimliğini hem kılığını doğru tahmin etti.`;
+      if (isKiller && inspectorWon)
+        return `Dedektif maskeni düşürdü.`;
+    }
     if (isInspector && inspectorWon) return `${killerSuspect?.name} suçüstü yakalandı.`;
     if (isInspector && killerWon)    return `Katil ${killerSuspect?.name} gözden kayboldu.`;
-    if (isKiller && killerWon)       return `Kimliğin gizli kaldı. Hedefine ulaştın.`;
-    if (isKiller && inspectorWon)    return `Dedektif maskeni düşürdü.`;
+    if (isKiller    && killerWon)    return `Kimliğin gizli kaldı. Hedefine ulaştın.`;
+    if (isKiller    && inspectorWon) return `Dedektif maskeni düşürdü.`;
     return '';
   })();
 
@@ -180,10 +212,13 @@ export default function EndScreen({ game, onReset }) {
           {killerSuspect && (
             <HeroCard
               suspect={killerSuspect}
-              label="Katil"
+              label={isStandard ? `Katil + Kılık` : 'Katil'}
               labelColor={killerWon ? '#C0392B' : '#888898'}
               dim={inspectorWon}
-              stamp={inspectorWon ? 'caught' : 'escaped'}
+              stamp={inspectorWon
+                ? (isStandard && isKiller ? 'wrong_solve' : 'caught')
+                : 'escaped'
+              }
             />
           )}
 

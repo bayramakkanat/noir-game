@@ -1,11 +1,11 @@
 
+import { useState } from 'react';
 import { useFullscreen } from '../hooks/useFullscreen.js';
 import menuBg from '../assets/menu-bg.png';
 import AmbientBackground from '../components/AmbientBackground.jsx';
 
 
-export default function SetupScreen({ onStart, onBack }) {
-
+export default function SetupScreen({ onStart, onBack, gameMode }) {
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
   return (
@@ -73,7 +73,7 @@ export default function SetupScreen({ onStart, onBack }) {
         </p>
 
         <button
-          onClick={() => onStart('killer')}
+          onClick={() => onStart('killer', gameMode)}
           className="w-full flex items-start gap-4 p-5 rounded-xl border transition-all duration-200 group text-left backdrop-blur-sm"
           style={{
             background: 'rgba(26,10,10,0.75)',
@@ -94,7 +94,7 @@ export default function SetupScreen({ onStart, onBack }) {
         </button>
 
         <button
-          onClick={() => onStart('inspector')}
+          onClick={() => onStart('inspector', gameMode)}
           className="w-full flex items-start gap-4 p-5 rounded-xl border transition-all duration-200 group text-left backdrop-blur-sm"
           style={{
             background: 'rgba(10,16,26,0.75)',

@@ -73,6 +73,17 @@ export function getBoardCoordTargets(game, pendingAction, roleSecrets) {
   if (pendingAction === 'arrest') {
     return getArrestTargets(game, roleSecrets?.inspectorSecretId);
   }
+  if (pendingAction === 'solve_identity' || pendingAction === 'solve_disguise') {
+    const targets = [];
+    for (let r = 0; r < game.board.length; r++) {
+      for (let c = 0; c < (game.board[r]?.length ?? 0); c++) {
+        if (game.board[r][c]) {
+          targets.push({ r, c, suspectId: game.board[r][c].suspectId });
+        }
+      }
+    }
+    return targets;
+  }
   return [];
 }
 

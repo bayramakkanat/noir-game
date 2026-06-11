@@ -82,7 +82,7 @@ function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageSc
   );
 }
 
-function MainMenu({ onSelect, isMuted, onToggleMute }) {
+function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGameMode }) {
   const [rulesOpen, setRulesOpen] = useState(false);
   const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
 
@@ -142,6 +142,31 @@ function MainMenu({ onSelect, isMuted, onToggleMute }) {
           </p>
         </div>
 
+        <div className="w-full flex rounded-xl overflow-hidden border border-white/[0.08] anim-fade-in mb-4" style={{ animationDelay: '0.1s' }}>
+            <button
+              type="button"
+              onClick={() => setGlobalGameMode('classic')}
+              className={`flex-1 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase transition-all duration-200 ${
+                globalGameMode === 'classic'
+                  ? 'bg-noir-accent/20 text-noir-accent border-r border-noir-accent/30'
+                  : 'bg-white/[0.03] text-white/30 hover:text-white/50 border-r border-white/[0.08]'
+              }`}
+            >
+              Klasik
+            </button>
+            <button
+              type="button"
+              onClick={() => setGlobalGameMode('standard')}
+              className={`flex-1 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase transition-all duration-200 ${
+                globalGameMode === 'standard'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-white/[0.03] text-white/30 hover:text-white/50'
+              }`}
+            >
+              Standart
+            </button>
+          </div>
+
         <div
           className="w-full rounded-2xl border border-white/[0.06] bg-black/30 backdrop-blur-xl p-3 sm:p-4 shadow-[0_16px_48px_rgba(0,0,0,0.45)] anim-fade-in"
           style={{ animationDelay: '0.15s' }}
@@ -179,7 +204,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute }) {
           Nasıl oynanır?
         </button>
 
-        {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} />}
+        {rulesOpen && <HowToPlayModal onClose={() => setRulesOpen(false)} initialTab={globalGameMode} />}
 
         <p
           className="mt-6 font-mono text-[9px] text-white/15 tracking-widest uppercase anim-fade-in"
@@ -194,6 +219,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute }) {
 
 export default function App() {
   const [mode, setMode] = useState('menu');
+  const [globalGameMode, setGlobalGameMode] = useState('standard');
   const [isMuted, setIsMuted] = useState(false);
   const solo = useGameState();
   const multi = usePeerMultiplayer();
@@ -204,7 +230,7 @@ export default function App() {
   useBgMusic(!soloInGame && !multiInGame && !isMuted);
 
   if (mode === 'menu') {
-    return <div className="grain"><MainMenu onSelect={setMode} isMuted={isMuted} onToggleMute={() => setIsMuted(!isMuted)} /></div>;
+    return <div className="grain"><MainMenu onSelect={setMode} isMuted={isMuted} onToggleMute={() => setIsMuted(!isMuted)} globalGameMode={globalGameMode} setGlobalGameMode={setGlobalGameMode} /></div>;
   }
 
   if (mode === 'solo') {
@@ -212,7 +238,7 @@ export default function App() {
     return (
       <div className="grain">
         {soloScreen === 'setup' && (
-          <SetupScreen onStart={solo.startGame} onBack={() => { solo.resetGame(); setMode('menu'); }} />
+          <SetupScreen onStart={solo.startGame} onBack={() => { solo.resetGame(); setMode('menu'); }} gameMode={globalGameMode} />
         )}
         {soloScreen === 'game' && (
           <GameScreen
@@ -230,6 +256,9 @@ export default function App() {
               beginExonerate: solo.beginExonerate,
               completeExonerate: solo.completeExonerate,
               executeDisguise: solo.executeDisguise,
+              executeSolve: solo.executeSolve,
+              beginSolve: solo.beginSolve,
+              dismissCanvas: solo.dismissCanvas,
               runAiTurn: solo.runAiTurn,
               getActingSecrets: solo.getActingSecrets,
               isCoordTargetable: solo.isCoordTargetable,

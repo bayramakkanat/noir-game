@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { createClassicGame } from '../game/setup.js';
-import { PHASE } from '../game/constants.js';
+import { createStandardGame } from '../game/setupStandard.js';
+import { GAME_MODE, PHASE } from '../game/constants.js';
 import {
   applyKill,
   applyArrest,
@@ -9,8 +10,19 @@ import {
   applyShift,
   applyInspectorPickIdentity,
 } from '../game/actions.js';
+import {
+  applyStandardKill,
+  applyStandardAccuse,
+  applyStandardExonerate,
+  applyStandardDisguise,
+  applyStandardShift,
+  applyStandardInspectorPickIdentity,
+  applyStandardSolve,
+  clearCanvas,
+} from '../game/actionsStandard.js';
 import { getActingSecrets } from '../game/setup.js';
 import { runAiTurn as runAiLogic } from '../game/ai.js';
+import { runStandardAiTurn } from '../game/aiStandard.js';
 import { isCoordTargetable } from '../game/validators.js';
 import {
   playClickSound,
@@ -24,8 +36,12 @@ import {
 export function useGameState() {
   const [game, setGame] = useState(null);
 
-  const startGame = useCallback((role) => {
-    setGame(createClassicGame(role));
+  const startGame = useCallback((role, gameMode = GAME_MODE.CLASSIC) => {
+    if (gameMode === GAME_MODE.STANDARD) {
+      setGame(createStandardGame(role));
+    } else {
+      setGame(createClassicGame(role));
+    }
   }, []);
 
   const resetGame = useCallback(() => setGame(null), []);
@@ -36,7 +52,7 @@ export function useGameState() {
 
   const cancelPending = useCallback(() => {
     setGame((g) =>
-      g ? { ...g, pendingAction: null, pendingShift: null, pendingExonerateDiscard: null } : g
+      g ? { ...g, pendingAction: null, pendingShift: null, pendingExonerateDiscard: null, solveGuess: {} } : g
     );
   }, []);
 
@@ -58,7 +74,9 @@ export function useGameState() {
     setGame((prev) => {
       if (!prev?.pendingShift || prev.pendingShift.step !== 'direction') return prev;
       const { axis, index } = prev.pendingShift;
-      const { ok, game: next } = applyShift(prev, axis, index, direction);
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      const fn = isStandard ? applyStandardShift : applyShift;
+      const { ok, game: next } = fn(prev, axis, index, direction);
       if (ok) playShiftSound();
       return next;
     });
@@ -70,14 +88,28 @@ export function useGameState() {
       const secrets = getActingSecrets(prev);
       const suspectId = prev.board[r]?.[c]?.suspectId;
       if (suspectId == null) return prev;
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
 
       if (prev.pendingAction === 'kill') {
-        const { ok, game: next } = applyKill(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        const fn = isStandard ? applyStandardKill : applyKill;
+        const { ok, game: next } = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         if (ok) playKillSound();
         return next;
       }
+      // Solve: kimlik seçimi (1. aşama)
+      if (prev.pendingAction === 'solve_identity') {
+        return { ...prev, pendingAction: 'solve_disguise', solveGuess: { identityId: suspectId } };
+      }
+
+      // Solve: kılık seçimi (2. aşama)
+      if (prev.pendingAction === 'solve_disguise') {
+        if (suspectId === prev.solveGuess?.identityId) return prev; // aynı kart seçilemez
+        const { ok, game: next } = applyStandardSolve(prev, prev.solveGuess.identityId, suspectId);
+        return ok ? next : prev;
+      }
       if (prev.pendingAction === 'arrest') {
-        const { ok, game: next } = applyArrest(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
+        const fn = isStandard ? applyStandardAccuse : applyArrest;
+        const { ok, game: next } = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         if (ok) {
           if (next.gameOver && next.winner === 'inspector') playArrestSuccessSound();
           else playArrestFailSound();
@@ -91,10 +123,34 @@ export function useGameState() {
   const pickInspectorIdentity = useCallback((cardSuspectId) => {
     setGame((prev) => {
       if (!prev || prev.activeSide !== 'human') return prev;
-      const { ok, game: next } = applyInspectorPickIdentity(prev, cardSuspectId);
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      const fn = isStandard ? applyStandardInspectorPickIdentity : applyInspectorPickIdentity;
+      const { ok, game: next } = fn(prev, cardSuspectId);
       if (ok) playClickSound();
       return next;
     });
+  }, []);
+
+  // Standart moda özgü: Solve hamlesi
+  const beginSolve = useCallback(() => {
+    setGame((prev) => {
+      if (!prev || prev.activeSide !== 'human') return prev;
+      return { ...prev, pendingAction: 'solve_identity', solveGuess: {} };
+    });
+  }, []);
+
+  const executeSolve = useCallback((guessIdentityId, guessDisguiseId) => {
+    setGame((prev) => {
+      if (!prev || prev.activeSide !== 'human') return prev;
+      const { ok, game: next } = applyStandardSolve(prev, guessIdentityId, guessDisguiseId);
+      if (ok) playClickSound();
+      return next;
+    });
+  }, []);
+
+  // Canvas mesajını temizle
+  const dismissCanvas = useCallback(() => {
+    setGame((prev) => prev ? clearCanvas(prev) : prev);
   }, []);
 
   const beginExonerate = useCallback(() => {
@@ -106,6 +162,13 @@ export function useGameState() {
   const completeExonerate = useCallback((discardId) => {
     setGame((prev) => {
       if (!prev || prev.activeSide !== 'human') return prev;
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      if (isStandard) {
+        const secrets = getActingSecrets(prev);
+        const { ok, game: next } = applyStandardExonerate(prev, discardId, secrets.killerIdentityId);
+        if (ok) playClickSound();
+        return next;
+      }
       const { ok, game: next } = applyExonerate(prev, discardId);
       if (ok) playClickSound();
       return next;
@@ -115,6 +178,12 @@ export function useGameState() {
   const executeDisguise = useCallback(() => {
     setGame((prev) => {
       if (!prev || prev.activeSide !== 'human') return prev;
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      if (isStandard) {
+        const { ok, game: next } = applyStandardDisguise(prev);
+        if (ok) playDisguiseSound();
+        return next;
+      }
       const { ok, game: next } = applyDisguise(prev, prev.killer, prev.inspector.secretIdentitySuspectId);
       if (ok) playDisguiseSound();
       return next;
@@ -124,7 +193,8 @@ export function useGameState() {
   const runAiTurn = useCallback(() => {
     setGame((prev) => {
       if (!prev || prev.gameOver || prev.activeSide !== 'ai') return prev;
-      return runAiLogic(prev);
+      const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      return isStandard ? runStandardAiTurn(prev) : runAiLogic(prev);
     });
   }, []);
 
@@ -159,8 +229,8 @@ export function useGameState() {
       aiTimerRef.current = null;
       setGame((prev) => {
         if (!prev || prev.gameOver || prev.activeSide !== 'ai') return prev;
-        const next = runAiLogic(prev);
-        // Eğer AI hiçbir şey yapamadıysa (aynı state döndü) zorla ilerle
+        const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+        const next = isStandard ? runStandardAiTurn(prev) : runAiLogic(prev);
         if (next === prev) {
           console.warn('[AI] Takıldı, faz:', prev.phase, 'el:', prev.inspector.hand);
         }
@@ -190,6 +260,9 @@ export function useGameState() {
     beginExonerate,
     completeExonerate,
     executeDisguise,
+    executeSolve,
+    beginSolve,
+    dismissCanvas,
     runAiTurn,
     getActingSecrets,
     isCoordTargetable,

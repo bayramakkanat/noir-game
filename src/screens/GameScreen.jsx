@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useFullscreen } from '../hooks/useFullscreen.js';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { PHASE, TURN, CELL_STATUS } from '../game/constants.js';
+import { PHASE, TURN, CELL_STATUS, GAME_MODE } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
 import SuspectCard from '../components/SuspectCard.jsx';
 
@@ -60,6 +60,12 @@ const actionBtnStyles = `
   .nb-yellow.nb-active .nb-title { color:#F0CC70; }
   .nb-yellow.nb-active .nb-sub { opacity:0.8; color:#F0CC70; }
   .nb-yellow.nb-active .nb-arrow { opacity:1; color:#F0CC70; }
+  /* renk: turuncu (solve) */
+  .nb-orange .nb-inner { background:rgba(200,100,30,0.07); border-color:rgba(200,100,30,0.25); }
+  .nb-orange:hover .nb-inner { background:rgba(200,100,30,0.15); border-color:rgba(200,100,30,0.6); }
+  .nb-orange .nb-icon { background:rgba(200,100,30,0.18); }
+  .nb-orange .nb-title { color:#E07840; }
+  .nb-orange .nb-arrow { color:#E07840; }
   /* Mobil: ikon+başlık yan yana, alt metin gizli */
   @media (max-width:1023px) {
     .nb-inner { padding:8px 10px; gap:8px; border-radius:8px; }
@@ -279,20 +285,33 @@ function useGridAndPanelSize(numRows, numCols) {
 // ─── Tutuklama flash efekti ──────────────────────────────────────────────────
 function useArrestFlash(game) {
   const [flashId, setFlashId] = React.useState(null);
+  const prevArrestCount = React.useRef(0);
   const prevInvestigated = React.useRef([]);
 
   React.useEffect(() => {
+    // Standart mod: arrestFailCount sayacı ile takip (aynı şüpheli tekrar tutuklanınca da tetiklenir)
+    const currCount = game.arrestFailCount ?? 0;
+    if (currCount > prevArrestCount.current) {
+      prevArrestCount.current = currCount;
+      const id = game.lastArrestedId;
+      if (id != null) {
+        setFlashId(id);
+        const t = setTimeout(() => setFlashId(null), 3000);
+        return () => clearTimeout(t);
+      }
+    }
+    // Klasik mod: investigated listesi ile takip
     const curr = game.inspector.investigated ?? [];
     const prev = prevInvestigated.current;
     if (curr.length > prev.length) {
       const newId = curr[curr.length - 1];
       setFlashId(newId);
-      const t = setTimeout(() => setFlashId(null), 1800);
+      const t = setTimeout(() => setFlashId(null), 3000);
       prevInvestigated.current = curr;
       return () => clearTimeout(t);
     }
     prevInvestigated.current = curr;
-  }, [game.inspector.investigated]);
+  }, [game.arrestFailCount, game.lastArrestedId, game.inspector.investigated]);
 
   return flashId;
 }
@@ -329,7 +348,7 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
 
   const isTargetable =
     humanCanAct &&
-    (pendingAction === 'kill' || pendingAction === 'arrest') &&
+    ['kill', 'arrest', 'solve_identity', 'solve_disguise'].includes(pendingAction) &&
     actions.isCoordTargetable(game, r, c, pendingAction, secrets);
 
   const isMyIdentity =
@@ -338,6 +357,39 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
       : cell.suspectId === secrets.inspectorSecretId;
 
   const isExonerated = game.publicExonerated.includes(cell.suspectId);
+
+  // Standart mod: sadece katil kendi yedek kılığını görür
+  const isDisguise =
+    game.gameMode === GAME_MODE.STANDARD &&
+    humanRole === 'killer' &&
+    cell.suspectId === game.killer.disguiseSuspectId;
+
+  // Canvas badge: her iki oyuncu da görür
+  // killer_answers → kılıç (katil komşuydu)
+  // inspector_answers → dedektif silüeti (dedektif komşuydu)
+  const isCanvasAdjacent = (() => {
+    const killerCanvases = game.positiveKillerCanvases ?? [];
+    const inspectorCanvases = game.positiveInspectorCanvases ?? [];
+    if (killerCanvases.includes(cell.suspectId)) return true;
+    if (inspectorCanvases.includes(cell.suspectId)) return true;
+    const canvas = game.pendingCanvas;
+    if (!canvas || !canvas.isAdjacent) return false;
+    return cell.suspectId === canvas.triggerSuspectId;
+  })();
+
+  // Canvas badge tipleri: her ikisi aynı anda olabilir
+  const canvasTypes = (() => {
+    const killerCanvases = game.positiveKillerCanvases ?? [];
+    const inspectorCanvases = game.positiveInspectorCanvases ?? [];
+    const types = new Set();
+    if (killerCanvases.includes(cell.suspectId)) types.add('killer');
+    if (inspectorCanvases.includes(cell.suspectId)) types.add('detective');
+    const canvas = game.pendingCanvas;
+    if (canvas?.isAdjacent && canvas.triggerSuspectId === cell.suspectId) {
+      types.add(canvas.type === 'killer_answers' ? 'killer' : 'detective');
+    }
+    return Array.from(types);
+  })();
 
   let cardState = 'normal';
   if (isDeceased) cardState = 'eliminated';
@@ -356,7 +408,7 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
       actions.pickInspectorIdentity(cell.suspectId);
       return;
     }
-    if (pendingAction === 'kill' || pendingAction === 'arrest') actions.executeBoardAction(r, c);
+    if (['kill', 'arrest', 'solve_identity', 'solve_disguise'].includes(pendingAction)) actions.executeBoardAction(r, c);
   }
 
   // Wrap-around kartlar (tahta sınırından dönenler) daha yüksek z-index ile uçsun
@@ -372,6 +424,13 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
     }
     return false;
   })();
+
+  // Solve renk sistemi
+  const isSolveIdentitySelected = pendingAction === 'solve_disguise' &&
+    cell.suspectId === game.solveGuess?.identityId;
+  const solveRingColor =
+    pendingAction === 'solve_identity' ? 'ring-red-500' :
+    pendingAction === 'solve_disguise' ? 'ring-purple-500' : 'ring-yellow-400';
 
   const isArrestFlash = cell && arrestFlashId === cell.suspectId;
 
@@ -389,7 +448,12 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
       className={`cursor-pointer`}
     >
       {(isTargetable || isPickable) && (
-        <div className="absolute inset-0 rounded-lg ring-[3px] ring-yellow-400 animate-pulse pointer-events-none z-20" />
+        <div className={`absolute inset-0 rounded-lg ring-[3px] ${solveRingColor} animate-pulse pointer-events-none z-20`} />
+      )}
+      {/* Kimlik seçildi — kırmızı sabit çerçeve */}
+      {isSolveIdentitySelected && (
+        <div className="absolute inset-0 rounded-lg ring-[3px] ring-red-500 pointer-events-none z-20"
+          style={{ boxShadow: '0 0 12px rgba(239,68,68,0.6)' }} />
       )}
       {/* Tutuklama flash efekti — mavi titreme */}
       {isArrestFlash && (
@@ -397,7 +461,7 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
           className="absolute inset-0 rounded-lg pointer-events-none z-30"
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: [0, 0.85, 0.6, 0.85, 0.5, 0], scale: [0.92, 1.06, 1, 1.04, 1, 0.96] }}
-          transition={{ duration: 1.6, ease: 'easeInOut' }}
+          transition={{ duration: 3.0, ease: 'easeInOut' }}
           style={{
             background: 'radial-gradient(ellipse at center, rgba(59,130,246,0.35) 0%, rgba(59,130,246,0.1) 60%, transparent 100%)',
             boxShadow: '0 0 20px rgba(59,130,246,0.6), inset 0 0 14px rgba(59,130,246,0.3)',
@@ -413,6 +477,9 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
         showName
         playerRole={humanRole}
         nameFontSize={Math.max(10, Math.round(cellSize * 0.15))}
+        canvasAdjacent={isCanvasAdjacent}
+        canvasTypes={canvasTypes}
+        isDisguise={isDisguise}
       />
     </motion.div>
   );
@@ -649,6 +716,142 @@ function ExonerateOverlay({ game, actions, cardSize = 74 }) {
   );
 }
 
+// ─── Solve overlay (Standart mod) ───────────────────────────────────────────
+function SolveOverlay({ game, actions, cardSize = 74 }) {
+  const [guessIdentity, setGuessIdentity] = React.useState(null);
+  const [guessDisguise, setGuessDisguise] = React.useState(null);
+
+  if (game.pendingAction !== 'solve') return null;
+
+  // Tahta üzerindeki tüm suspect'leri listele (cansız dahil)
+  const allSuspects = game.board.flat().filter(Boolean);
+  // Öldürülenler de seçilebilir (Disguise ölmüş olabilir)
+  const allIds = [
+    ...allSuspects.map(c => c.suspectId),
+    ...(game.killedSuspectIds ?? []),
+  ];
+  const uniqueIds = [...new Set(allIds)];
+
+  function toggle(id, slot) {
+    if (slot === 'identity') {
+      setGuessIdentity(prev => prev === id ? null : id);
+    } else {
+      setGuessDisguise(prev => prev === id ? null : id);
+    }
+  }
+
+  const canConfirm = guessIdentity !== null && guessDisguise !== null && guessIdentity !== guessDisguise;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#0E0E16] border border-noir-border rounded-2xl p-6 max-w-2xl w-full anim-fade-in">
+        <div className="font-mono text-[10px] tracking-widest text-orange-400/70 uppercase mb-1">Çözüm</div>
+        <h2 className="font-display text-xl text-noir-text mb-1">Katili ve kılığını belirle</h2>
+        <p className="text-[11px] text-[#7A7A6A] font-mono mb-5">
+          Yanlış tahmin edersan katil kazanır!
+        </p>
+
+        {/* İki sütun: Identity + Disguise */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {/* Kimlik seçimi */}
+          <div>
+            <div className="font-mono text-[10px] text-orange-300 tracking-widest uppercase mb-2">
+              Katil Kimliği
+              {guessIdentity && (
+                <span className="ml-2 text-orange-400">— {suspect(guessIdentity).name}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1"
+              style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
+              {uniqueIds.map(id => {
+                const isSelected = guessIdentity === id;
+                const isDead = (game.killedSuspectIds ?? []).includes(id);
+                return (
+                  <div
+                    key={id}
+                    onClick={() => toggle(id, 'identity')}
+                    className={`cursor-pointer rounded-lg transition-all ${
+                      isSelected
+                        ? 'ring-2 ring-orange-400 scale-105'
+                        : 'opacity-60 hover:opacity-90 hover:scale-102'
+                    }`}
+                  >
+                    <SuspectCard
+                      suspect={suspect(id)}
+                      size={Math.min(cardSize, 60)}
+                      showName={false}
+                      state={isDead ? 'eliminated' : 'normal'}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Kılık seçimi */}
+          <div>
+            <div className="font-mono text-[10px] text-purple-300 tracking-widest uppercase mb-2">
+              Yedek Kılık
+              {guessDisguise && (
+                <span className="ml-2 text-purple-400">— {suspect(guessDisguise).name}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1"
+              style={{ scrollbarWidth: 'thin', scrollbarColor: '#2A2A3E transparent' }}>
+              {uniqueIds.map(id => {
+                const isSelected = guessDisguise === id;
+                const isDead = (game.killedSuspectIds ?? []).includes(id);
+                const isDisabled = id === guessIdentity;
+                return (
+                  <div
+                    key={id}
+                    onClick={() => !isDisabled && toggle(id, 'disguise')}
+                    className={`rounded-lg transition-all ${
+                      isDisabled
+                        ? 'opacity-20 cursor-not-allowed'
+                        : isSelected
+                          ? 'ring-2 ring-purple-400 scale-105 cursor-pointer'
+                          : 'opacity-60 hover:opacity-90 cursor-pointer'
+                    }`}
+                  >
+                    <SuspectCard
+                      suspect={suspect(id)}
+                      size={Math.min(cardSize, 60)}
+                      showName={false}
+                      state={isDead ? 'eliminated' : 'normal'}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Onay */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={actions.cancelPending}
+            className="font-mono text-[10px] text-[#8080A0] hover:text-[#AAAAB0] transition-colors"
+          >
+            iptal
+          </button>
+          <button
+            onClick={() => canConfirm && actions.executeSolve(guessIdentity, guessDisguise)}
+            disabled={!canConfirm}
+            className={`px-5 py-2.5 rounded-xl font-mono text-[11px] tracking-widest uppercase font-semibold transition-all ${
+              canConfirm
+                ? 'bg-orange-500/20 border border-orange-500/60 text-orange-300 hover:bg-orange-500/30 hover:border-orange-400'
+                : 'bg-white/5 border border-white/10 text-white/20 cursor-not-allowed'
+            }`}
+          >
+            🎯 Tahminimi Onayla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Toast Bildirimleri ───────────────────────────────────────────────────────
 function ToastNotification({ logs }) {
   const [dismissedIndex, setDismissedIndex] = React.useState(-1);
@@ -809,22 +1012,32 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
                     <span className="nb-arrow">{pendingAction === 'kill' ? '✕' : '›'}</span>
                   </div>
                 </button>
-                {inPlay && (
-                  <button
-                    onClick={actions.executeDisguise}
-                    disabled={evidenceDeck.length === 0}
-                    className="noir-action-btn nb-purple"
-                  >
-                    <div className="nb-inner">
-                      <div className="nb-icon">⇄</div>
-                      <div className="nb-text">
-                        <span className="nb-title">Kılık Değiştir</span>
-                        <span className="nb-sub">Desteden yeni kimlik çek</span>
+                {inPlay && (() => {
+                  const isStandard = game.gameMode === GAME_MODE.STANDARD;
+                  const disguiseDead = isStandard
+                    ? (game.killedSuspectIds ?? []).includes(game.killer.disguiseSuspectId)
+                    : game.evidenceDeck.length === 0;
+                  return (
+                    <button
+                      onClick={actions.executeDisguise}
+                      disabled={disguiseDead}
+                      className="noir-action-btn nb-purple"
+                    >
+                      <div className="nb-inner">
+                        <div className="nb-icon">⇄</div>
+                        <div className="nb-text">
+                          <span className="nb-title">Kılık Değiştir</span>
+                          <span className="nb-sub">
+                            {isStandard
+                              ? (disguiseDead ? 'Yedek kılık öldü' : 'Yedeğe geç')
+                              : 'Desteden yeni kimlik çek'}
+                          </span>
+                        </div>
+                        <span className="nb-arrow">›</span>
                       </div>
-                      <span className="nb-arrow">›</span>
-                    </div>
-                  </button>
-                )}
+                    </button>
+                  );
+                })()}
               </>
             )}
 
@@ -852,11 +1065,38 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
                     <div className="nb-icon">✓</div>
                     <div className="nb-text">
                       <span className="nb-title">Temize Çıkar</span>
-                      <span className="nb-sub">Elindeki kartı at, masumu kurtар</span>
+                      <span className="nb-sub">Elindeki kartı at, masumu kurtar</span>
                     </div>
                     <span className="nb-arrow">›</span>
                   </div>
                 </button>
+                {game.gameMode === GAME_MODE.STANDARD && (
+                  <button
+                    onClick={
+                      pendingAction === 'solve_identity' || pendingAction === 'solve_disguise'
+                        ? actions.cancelPending
+                        : actions.beginSolve
+                    }
+                    className={`noir-action-btn nb-orange${
+                      pendingAction === 'solve_identity' || pendingAction === 'solve_disguise' ? ' nb-active' : ''
+                    }`}
+                  >
+                    <div className="nb-inner">
+                      <div className="nb-icon">🎯</div>
+                      <div className="nb-text">
+                        <span className="nb-title">Çöz</span>
+                        <span className="nb-sub">
+                          {pendingAction === 'solve_identity' ? 'Katil kimliğini seç'
+                            : pendingAction === 'solve_disguise' ? 'Yedek kılığı seç'
+                            : 'Kimliği ve kılığı tahmin et'}
+                        </span>
+                      </div>
+                      <span className="nb-arrow">
+                        {pendingAction === 'solve_identity' || pendingAction === 'solve_disguise' ? '✕' : '›'}
+                      </span>
+                    </div>
+                  </button>
+                )}
               </>
             )}
 
@@ -885,13 +1125,22 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
           <p className="font-mono text-[10px] text-blue-400 uppercase tracking-widest mb-0.5">Gizli Kimlik Seç</p>
           <p className="text-[11px] text-[#AAAAB0] mb-3">Aşağıdaki kartlardan birini seç.</p>
           <div className="flex flex-wrap gap-2 justify-center">
-            {inspector.hand.map((id) => (
-              <div key={id} className="flex flex-col items-center cursor-pointer group" onClick={() => actions.pickInspectorIdentity(id)}>
-                <div className="ring-2 ring-blue-500/60 group-hover:ring-blue-400 rounded-lg transition-all group-hover:scale-105">
-                  <SuspectCard suspect={suspect(id)} size={cardSize} showName playerRole="inspector" state="normal" />
+            {inspector.hand.map((id) => {
+              const isKilled = (game.killedSuspectIds ?? []).includes(id);
+              return (
+                <div
+                  key={id}
+                  className={`flex flex-col items-center cursor-pointer group ${
+                    isKilled ? 'opacity-30 pointer-events-none' : ''
+                  }`}
+                  onClick={() => !isKilled && actions.pickInspectorIdentity(id)}
+                >
+                  <div className="ring-2 ring-blue-500/60 group-hover:ring-blue-400 rounded-lg transition-all group-hover:scale-105">
+                    <SuspectCard suspect={suspect(id)} size={cardSize} showName playerRole="inspector" state={isKilled ? 'eliminated' : 'normal'} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
