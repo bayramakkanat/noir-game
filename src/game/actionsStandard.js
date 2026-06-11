@@ -55,9 +55,10 @@ function advanceTurn(game) {
 
 // Win kontrolü — sadece öldürme sonrası çağrılmalı
 function applyWinChecks(game, inspectorSecretId) {
-  if ((game.killCount ?? 0) >= STANDARD_KILLER_WIN_DEATH_COUNT) return endGame(game, 'killer');
+  if ((game.killCount ?? 0) >= STANDARD_KILLER_WIN_DEATH_COUNT)
+    return endGame({ ...game, winReason: 'deaths' }, 'killer');
   if (inspectorSecretId != null && (game.killedSuspectIds ?? []).includes(inspectorSecretId)) {
-    return endGame(game, 'killer');
+    return endGame({ ...game, winReason: 'inspector_killed' }, 'killer');
   }
   return game;
 }
@@ -249,7 +250,7 @@ export function applyStandardSolve(game, guessIdentityId, guessDisguiseId) {
   }
 
   next = addLog(next, `❌ Yanlış tahmin! Gerçek Katil: <b>${suspectName(realIdentity)}</b>, Kılık: <b>${suspectName(realDisguise)}</b>.`);
-  return { ok: true, game: endGame(next, 'killer') };
+  return { ok: true, game: endGame({ ...next, winReason: 'wrong_solve', solveGuess: { identityId: guessIdentityId, disguiseId: guessDisguiseId } }, 'killer') };
 }
 
 // ─── Shift ────────────────────────────────────────────────────────────────────

@@ -71,7 +71,17 @@ export default function SuspectCard({
           {state === 'exonerated' && (
             <>
               <div className="absolute inset-0 bg-noir-green/15 flex items-center justify-center pointer-events-none z-10" />
-              <div className="absolute top-2 right-1 bg-noir-green text-black font-display font-bold text-[10px] px-1.5 py-0.5 rounded shadow-sm rotate-12 pointer-events-none z-20 border border-black/20 tracking-wider">
+              <div
+                className="absolute bg-noir-green text-black font-display font-bold rounded shadow-sm pointer-events-none z-20 border border-black/20 tracking-wider"
+                style={{
+                  fontSize: Math.max(7, Math.round(size * 0.1)),
+                  padding: '1px 4px',
+                  bottom: Math.max(14, Math.round(size * 0.22)),
+                  left: 4,
+                  rotate: '-8deg',
+                  transform: 'rotate(-8deg)',
+                }}
+              >
                 MASUM
               </div>
             </>

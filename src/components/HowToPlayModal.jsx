@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { KILLER_WIN_DEATH_COUNT, STANDARD_KILLER_WIN_DEATH_COUNT } from '../game/constants.js';
+import dedektifImg from '../assets/dedektif.png';
 
 function RuleSection({ title, children }) {
   return (
@@ -182,7 +183,7 @@ function StandardRules() {
           <li>
             <strong className="text-green-400/80">Temize çıkar</strong> — Elindeki bir kanıt kartını tahtada
             o karakterin üzerine koy. <strong className="text-amber-400/80">Canvas</strong> tetiklenir: katil,
-            gizli kimliğinin veya yedek kılığının o karaktere komşu olup olmadığını söyler. Elini 3'te tut.
+            gizli kimliğinin veya yedek kılığının o karaktere komşu olup olmadığını söyler.
           </li>
           <li>
             <strong className="text-orange-400/80">Çöz</strong> — Katilin hem gizli kimliğini hem yedek kılığını
@@ -197,18 +198,58 @@ function StandardRules() {
       <RuleSection title="Canvas sistemi">
         <p>
           Canvas, iki tarafın da bilgi topladığı temel mekanizmadır. Tetiklendiğinde yalnızca
-          "komşu mu, değil mi" bilgisi verilir; kim olduğu söylenmez.
+          &quot;komşu mu, değil mi&quot; bilgisi verilir; kim olduğu söylenmez.
         </p>
-        <ul className="list-disc pl-5 space-y-1.5 marker:text-amber-400/50">
-          <li>
-            Katil, <em>temize çıkarılmış</em> birini öldürünce → Dedektif, kendi kimliğinin o karaktere
-            komşu olup olmadığını açıklar.
-          </li>
-          <li>
-            Dedektif Temize Çıkar hamlesi yaparken → Katil, kimlik veya yedek kılığından herhangi birinin
-            o karaktere komşu olup olmadığını açıklar.
-          </li>
-        </ul>
+
+        {/* Senaryo 1 — Katil temize çıkarılmış birini öldürünce */}
+        <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+          <p className="font-mono text-[10px] tracking-widest uppercase text-amber-400/70 mb-2">
+            Senaryo 1 — Katil öldürünce
+          </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-col items-center gap-1 shrink-0 w-14">
+              <div className="w-10 h-12 rounded-lg border-2 border-red-400/60 bg-[#1A0A0A] flex items-center justify-center relative shadow-lg mx-auto">
+                <img src={dedektifImg} alt="Dedektif" className="w-7 h-7 object-contain" style={{ filter: 'invert(1)' }} />
+                <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border border-[#1A0A0A]" />
+              </div>
+              <span className="font-mono text-[8px] text-red-400/70 tracking-wide">Öldürüldü</span>
+            </div>
+            <span className="text-[#4A4A5E] text-lg shrink-0">→</span>
+            <div className="flex-1 rounded-lg bg-blue-500/10 border border-blue-400/25 px-2.5 py-1.5">
+              <p className="font-mono text-[9px] text-blue-300/80 leading-snug">
+                Karakterin üzerinde <img src={dedektifImg} alt="Dedektif" className="inline w-4 h-4 object-contain align-middle mx-0.5" style={{ filter: 'invert(1)' }} /> belirir → dedektifin gizli kimliği o karaktere <strong className="text-blue-300">komşu</strong> demektir.
+              </p>
+            </div>
+          </div>
+          <p className="text-[11px] text-[#7A7A90] leading-snug">
+            Katil <em>temize çıkarılmış</em> bir karakteri öldürdüğünde Canvas tetiklenir. Dedektif, kendi gizli kimliğinin o karaktere komşu olup olmadığını açıklamak zorundadır.
+          </p>
+        </div>
+
+        {/* Senaryo 2 — Dedektif temize çıkarma yaparken */}
+        <div className="mt-2 rounded-xl border border-green-400/20 bg-green-400/5 p-3">
+          <p className="font-mono text-[10px] tracking-widest uppercase text-green-400/70 mb-2">
+            Senaryo 2 — Dedektif temize çıkarınca
+          </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex flex-col items-center gap-1 shrink-0 w-14">
+              <div className="w-10 h-12 rounded-lg border-2 border-green-400/60 bg-[#0A1A0A] flex items-center justify-center relative shadow-lg mx-auto">
+                <span className="text-xl">🗡️</span>
+                <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500 border border-[#0A1A0A]" />
+              </div>
+              <span className="font-mono text-[8px] text-green-400/70 tracking-wide">Temize çıkarıldı</span>
+            </div>
+            <span className="text-[#4A4A5E] text-lg shrink-0">→</span>
+            <div className="flex-1 rounded-lg bg-red-500/10 border border-red-400/25 px-2.5 py-1.5">
+              <p className="font-mono text-[9px] text-red-300/80 leading-snug">
+                Karakterin üzerinde <span className="text-white/70">🗡️</span> belirir → katil o karaktere <strong className="text-red-300">komşu</strong> demektir.
+              </p>
+            </div>
+          </div>
+          <p className="text-[11px] text-[#7A7A90] leading-snug">
+            Dedektif Temize Çıkar hamlesi yaptığında katil, kimliğinin veya yedek kılığının o karaktere komşu olup olmadığını açıklar.
+          </p>
+        </div>
       </RuleSection>
 
       <RuleSection title="Tahta daralması">

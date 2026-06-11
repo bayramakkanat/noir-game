@@ -51,9 +51,10 @@ function advanceTurnAfterAction(game) {
 }
 
 function applyWinChecks(game, killerIdentityId, inspectorSecretId) {
-  if (checkKillerWinByDeaths(game.killCount ?? 0)) return endGame(game, 'killer');
+  if (checkKillerWinByDeaths(game.killCount ?? 0))
+    return endGame({ ...game, winReason: 'deaths' }, 'killer');
   if (checkKillerWinByKillingInspector(game.board, inspectorSecretId, game.killedSuspectIds))
-    return endGame(game, 'killer');
+    return endGame({ ...game, winReason: 'inspector_killed' }, 'killer');
   return game;
 }
 
@@ -103,7 +104,7 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
   const realKillerId = game.killer.identitySuspectId;
   if (checkInspectorWinByArrest(targetSuspectId, realKillerId)) {
     next = addLog(next, `🔗 Tutuklama başarılı: <b>${name}</b> katildi!`);
-    return { ok: true, game: endGame(next, 'inspector') };
+    return { ok: true, game: endGame({ ...next, winReason: 'arrest' }, 'inspector') };
   }
 
   next = addLog(next, `🔗 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);

@@ -2,8 +2,9 @@ import { motion } from 'framer-motion';
 import { SUSPECTS } from '../data/suspects';
 import SuspectCard from '../components/SuspectCard.jsx';
 import AmbientBackground from '../components/AmbientBackground.jsx';
-import menuBg from '../assets/menu-bg.png';
-// Karakter görsel yükleyici (SuspectCard ile aynı mantık)
+import endBg from '../assets/end.png';
+import { KILLER_WIN_DEATH_COUNT, STANDARD_KILLER_WIN_DEATH_COUNT } from '../game/constants.js';
+
 const characterImages = import.meta.glob('../assets/characters/*.png', { eager: true });
 function getCharacterImage(id) {
   const key = Object.keys(characterImages).find(k => {
@@ -14,7 +15,6 @@ function getCharacterImage(id) {
   return key ? characterImages[key].default : null;
 }
 
-// Büyük karakter görseli — bitiş ekranı için
 function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp = null }) {
   const img = getCharacterImage(suspect.id);
   return (
@@ -24,7 +24,6 @@ function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp =
       transition={{ type: 'spring', stiffness: 80, damping: 18, delay: 0.15 }}
       className="relative flex flex-col items-center"
     >
-      {/* Kart */}
       <div
         className="relative rounded-xl overflow-hidden border-2 shadow-2xl"
         style={{
@@ -41,127 +40,209 @@ function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp =
             {dim ? '🔍' : '🗡️'}
           </div>
         )}
-
-        {/* Alt isim bandı */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
           <div className="font-body text-xs font-semibold text-white leading-tight">{suspect.name}</div>
         </div>
 
-        {/* Stamp */}
         {stamp === 'caught' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="border-4 border-[#C0392B] text-[#C0392B] font-display font-black tracking-widest px-3 py-1 rotate-[-18deg] opacity-90 text-lg"
-              style={{ textShadow: '0 0 8px #C0392B88' }}
-            >
+            <div className="border-4 border-[#C0392B] text-[#C0392B] font-display font-black tracking-widest px-3 py-1 rotate-[-18deg] opacity-90 text-lg"
+              style={{ textShadow: '0 0 8px #C0392B88' }}>
               YAKALANDI
             </div>
           </div>
         )}
         {stamp === 'wrong_solve' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="border-4 border-[#8B5CF6] text-[#8B5CF6] font-display font-black tracking-widest px-2 py-1 rotate-[-18deg] opacity-90 text-base"
-              style={{ textShadow: '0 0 8px #8B5CF688' }}
-            >
+            <div className="border-4 border-[#8B5CF6] text-[#8B5CF6] font-display font-black tracking-widest px-2 py-1 rotate-[-18deg] opacity-90 text-base"
+              style={{ textShadow: '0 0 8px #8B5CF688' }}>
               YANLIŞ TAHMİN
             </div>
           </div>
         )}
         {stamp === 'escaped' && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="border-4 border-[#D4A017] text-[#D4A017] font-display font-black tracking-widest px-3 py-1 rotate-[-18deg] opacity-90 text-lg"
-              style={{ textShadow: '0 0 8px #D4A01788' }}
-            >
+            <div className="border-4 border-[#D4A017] text-[#D4A017] font-display font-black tracking-widest px-3 py-1 rotate-[-18deg] opacity-90 text-lg"
+              style={{ textShadow: '0 0 8px #D4A01788' }}>
               KAÇTI
             </div>
           </div>
         )}
+        {stamp === 'killed' && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="border-4 border-[#C0392B] text-[#C0392B] font-display font-black tracking-widest px-3 py-1 rotate-[-18deg] opacity-90 text-lg"
+              style={{ textShadow: '0 0 8px #C0392B88' }}>
+              ÖLDÜ
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Alt etiket */}
-      <div className="mt-2 font-mono text-[10px] tracking-widest uppercase" style={{ color: labelColor }}>
+      <div
+        className="mt-2 font-mono font-bold text-[10px] tracking-widest uppercase px-2 py-0.5 rounded"
+        style={{
+          color: labelColor,
+          background: 'rgba(8,8,14,0.85)',
+          textShadow: `0 0 6px ${labelColor}, 0 0 14px ${labelColor}BB`,
+          filter: 'brightness(1.4)',
+        }}
+      >
         {label}
       </div>
     </motion.div>
   );
 }
 
+// Kazanma/kaybetme sebebini açıklayan metin bloğu
+function buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect }) {
+  const { winReason, winner, humanRole, killCount, killedSuspectIds, gameMode, solveGuess } = game;
+  const isStandard = gameMode === 'standard';
+  const killerWon = winner === 'killer';
+  const inspectorWon = winner === 'inspector';
+  const killLimit = isStandard ? STANDARD_KILLER_WIN_DEATH_COUNT : KILLER_WIN_DEATH_COUNT;
+
+  // Oyuncu rolüne göre özelleştirilmiş satır
+  // Ana neden satırı (herkese gösterilen)
+  const lines = [];
+
+  if (winReason === 'deaths') {
+    lines.push({
+      icon: '🗡️',
+      text: `${killerSuspect?.name ?? 'Katil'}, ${killCount ?? killLimit} şüpheliyi öldürerek kaçmayı başardı.`,
+      color: '#C0392B',
+    });
+    if (humanRole === 'inspector') {
+      lines.push({ icon: '📋', text: 'Katili zamanında durduramadın.', color: '#888898' });
+    } else {
+      lines.push({ icon: '🎭', text: `Kimliğin: ${killerSuspect?.name}. Gizli kaldın, kaçtın.`, color: '#D4A017' });
+    }
+  }
+
+  else if (winReason === 'inspector_killed') {
+    lines.push({
+      icon: '🗡️',
+      text: `Katil, dedektifin gizli kimliği ${inspectorSuspect?.name ?? '?'}'ı öldürdü.`,
+      color: '#C0392B',
+    });
+    if (humanRole === 'inspector') {
+      lines.push({ icon: '💀', text: 'Gizli kimliğin tahtada öldürüldü.', color: '#888898' });
+    } else {
+      lines.push({ icon: '🎯', text: 'Dedektifin gizli kimliğini bulup etkisiz kıldın.', color: '#D4A017' });
+    }
+  }
+
+  else if (winReason === 'arrest') {
+    lines.push({
+      icon: '🔗',
+      text: `Dedektif, ${killerSuspect?.name ?? 'katil'}'i suçüstü tutuklayarak davayı kapattı.`,
+      color: '#4090C8',
+    });
+    if (humanRole === 'killer') {
+      lines.push({ icon: '🚨', text: 'Kimliğin dedektife deşifre oldu.', color: '#888898' });
+    } else {
+      lines.push({ icon: '✅', text: 'Doğru kişiyi yakaladın.', color: '#4090C8' });
+    }
+  }
+
+  else if (winReason === 'solve') {
+    lines.push({
+      icon: '🎯',
+      text: `Dedektif, katil ${killerSuspect?.name}'ı ve kılığı ${disguiseSuspect?.name}'ı doğru tahmin etti.`,
+      color: '#4090C8',
+    });
+    if (humanRole === 'killer') {
+      lines.push({ icon: '🔍', text: 'Kimliğin ve kılığın çözüldü.', color: '#888898' });
+    } else {
+      lines.push({ icon: '🧠', text: 'İki ipucunu da doğru birleştirdin.', color: '#4090C8' });
+    }
+  }
+
+  else if (winReason === 'wrong_solve') {
+    const guessedIdentity = solveGuess?.identityId != null
+      ? SUSPECTS.find(s => s.id === solveGuess.identityId)?.name ?? '?'
+      : '?';
+    const guessedDisguise = solveGuess?.disguiseId != null
+      ? SUSPECTS.find(s => s.id === solveGuess.disguiseId)?.name ?? '?'
+      : '?';
+    lines.push({
+      icon: '❌',
+      text: `Dedektif yanlış tahmin yaptı — Tahmini: ${guessedIdentity} / ${guessedDisguise}.`,
+      color: '#C0392B',
+    });
+    lines.push({
+      icon: '🎭',
+      text: `Gerçek Katil: ${killerSuspect?.name}, Kılık: ${disguiseSuspect?.name}.`,
+      color: '#D4A017',
+    });
+  }
+
+  // Eğer winReason yoksa (eski kayıt uyumu için) basit fallback
+  else {
+    if (killerWon && humanRole === 'inspector')
+      lines.push({ icon: '🗡️', text: `Katil ${killerSuspect?.name} gözden kayboldu.`, color: '#C0392B' });
+    else if (killerWon && humanRole === 'killer')
+      lines.push({ icon: '🎭', text: 'Kimliğin gizli kaldı. Hedefine ulaştın.', color: '#D4A017' });
+    else if (inspectorWon && humanRole === 'inspector')
+      lines.push({ icon: '🔗', text: `${killerSuspect?.name} yakalandı.`, color: '#4090C8' });
+    else if (inspectorWon && humanRole === 'killer')
+      lines.push({ icon: '🔍', text: 'Dedektif maskeni düşürdü.', color: '#888898' });
+  }
+
+  return lines;
+}
+
 export default function EndScreen({ game, onReset }) {
-  const killerWon      = game.winner === 'killer';
-  const inspectorWon   = game.winner === 'inspector';
-  const isKiller       = game.humanRole === 'killer';
-  const isInspector    = game.humanRole === 'inspector';
-  const playerWon      = (isKiller && killerWon) || (isInspector && inspectorWon);
+  const killerWon    = game.winner === 'killer';
+  const inspectorWon = game.winner === 'inspector';
+  const isKiller     = game.humanRole === 'killer';
+  const isInspector  = game.humanRole === 'inspector';
+  const playerWon    = (isKiller && killerWon) || (isInspector && inspectorWon);
 
-  const killerSuspect     = SUSPECTS.find(s => s.id === game.killer.identitySuspectId);
-  const inspectorSuspect  = SUSPECTS.find(s => s.id === game.inspector.secretIdentitySuspectId);
+  const killerSuspect    = SUSPECTS.find(s => s.id === game.killer.identitySuspectId);
+  const inspectorSuspect = SUSPECTS.find(s => s.id === game.inspector.secretIdentitySuspectId);
+  const isStandard       = game.gameMode === 'standard';
+  const disguiseSuspect  = isStandard ? SUSPECTS.find(s => s.id === game.killer.disguiseSuspectId) : null;
 
-  // Öldürülenler (son 4 tane, fazlası olursa) — tahtadan kaldırılmış satır/sütunlar dahil
   const deceasedSuspects = (game.killedSuspectIds ?? [])
     .map(id => SUSPECTS.find(s => s.id === id))
     .filter(Boolean)
     .filter(s => s.id !== killerSuspect?.id && s.id !== inspectorSuspect?.id)
-    .slice(-4);
+    .slice(-5);
 
-  const isStandard = game.gameMode === 'standard';
-  const disguiseSuspect = isStandard
-    ? SUSPECTS.find(s => s.id === game.killer.disguiseSuspectId)
-    : null;
+  const accentColor = killerWon ? '#C0392B' : '#4090C8';
+  const glowColor   = killerWon ? '#C0392B44' : '#4090C844';
 
-  // Tema renkleri
-  const accentColor  = killerWon ? '#C0392B' : '#4090C8';
-  const glowColor    = killerWon ? '#C0392B44' : '#4090C844';
-  const bgGradient   = killerWon
-    ? 'radial-gradient(ellipse at 50% 0%, #1A0808 0%, #0D0D14 60%)'
-    : 'radial-gradient(ellipse at 50% 0%, #08101A 0%, #0D0D14 60%)';
+  const headline = killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI';
 
-  // Başlık metni
-  const headline = playerWon
-    ? (killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI')
-    : (killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI');
-
-  const subtext = (() => {
-    if (isStandard) {
-      const winReason = game.winReason;
-      if (isInspector && inspectorWon && winReason === 'solve')
-        return `${killerSuspect?.name} ve kılığı ${disguiseSuspect?.name} doğru tahmin edildi.`;
-      if (isInspector && inspectorWon && winReason === 'arrest')
-        return `${killerSuspect?.name} suçüstü yakalandı.`;
-      if (isInspector && inspectorWon)
-        return `${killerSuspect?.name} yakalandı.`;
-      if (isInspector && killerWon)
-        return `Yanlış tahmin. Katil: ${killerSuspect?.name}, Kılık: ${disguiseSuspect?.name}.`;
-      if (isKiller && killerWon)
-        return `Kimliğin ${killerSuspect?.name}, kılığın ${disguiseSuspect?.name}. İkisi de gizli kaldı.`;
-      if (isKiller && inspectorWon && winReason === 'solve')
-        return `Dedektif hem kimliğini hem kılığını doğru tahmin etti.`;
-      if (isKiller && inspectorWon)
-        return `Dedektif maskeni düşürdü.`;
+  // Katil kartı için stamp
+  const killerStamp = (() => {
+    if (inspectorWon) {
+      if (game.winReason === 'wrong_solve') return null; // katil kartı yok stamp, dedektif yanlış tahmin → katil kazandı aslında bu branch olmaz ama güvenli
+      return 'caught';
     }
-    if (isInspector && inspectorWon) return `${killerSuspect?.name} suçüstü yakalandı.`;
-    if (isInspector && killerWon)    return `Katil ${killerSuspect?.name} gözden kayboldu.`;
-    if (isKiller    && killerWon)    return `Kimliğin gizli kaldı. Hedefine ulaştın.`;
-    if (isKiller    && inspectorWon) return `Dedektif maskeni düşürdü.`;
-    return '';
+    return 'escaped';
   })();
+
+  // İnspektör kartı için stamp
+  const inspectorStamp = (() => {
+    if (game.winReason === 'inspector_killed') return 'killed';
+    return null;
+  })();
+
+  const summaryLines = buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect });
+
+  const killCount = game.killCount ?? (game.killedSuspectIds?.length ?? 0);
+  const killLimit = isStandard ? STANDARD_KILLER_WIN_DEATH_COUNT : KILLER_WIN_DEATH_COUNT;
 
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden"
       style={{
-        backgroundImage: `url(${menuBg})`,
+        backgroundImage: `url(${endBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
     >
-      {/* Ambient arka plan — katil kazandıysa kırmızı, dedektif kazandıysa mavi */}
-      <AmbientBackground
-        variant={killerWon ? 'lobby' : 'setup'}
-        density="full"
-        className="z-[1]"
-      />
+      <AmbientBackground variant={killerWon ? 'lobby' : 'setup'} density="full" className="z-[1]" />
       <div className="absolute inset-0 bg-black/60 z-[2]" />
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none z-[2]"
@@ -208,21 +289,16 @@ export default function EndScreen({ game, onReset }) {
 
         {/* Ana karakterler */}
         <div className="flex items-end justify-center gap-6 mb-6">
-          {/* Katil */}
           {killerSuspect && (
             <HeroCard
               suspect={killerSuspect}
-              label={isStandard ? `Katil + Kılık` : 'Katil'}
-              labelColor={killerWon ? '#C0392B' : '#888898'}
-              dim={inspectorWon}
-              stamp={inspectorWon
-                ? (isStandard && isKiller ? 'wrong_solve' : 'caught')
-                : 'escaped'
-              }
+              label="Katilin Kimliği"
+              labelColor='#C0392B'
+              dim={inspectorWon && game.winReason !== 'inspector_killed'}
+              stamp={inspectorWon ? 'caught' : 'escaped'}
             />
           )}
 
-          {/* VS ayracı */}
           <motion.div
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -233,36 +309,83 @@ export default function EndScreen({ game, onReset }) {
             vs
           </motion.div>
 
-          {/* Dedektif */}
           {inspectorSuspect && (
             <HeroCard
               suspect={inspectorSuspect}
               label="Dedektif"
               labelColor={inspectorWon ? '#4090C8' : '#888898'}
-              dim={killerWon}
-              stamp={null}
+              dim={killerWon && game.winReason !== 'inspector_killed'}
+              stamp={inspectorStamp}
             />
           )}
         </div>
 
-        {/* Açıklama */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.45 }}
-          className="font-body text-sm text-center leading-relaxed mb-4"
-          style={{ color: '#9A9890' }}
-        >
-          {subtext}
-        </motion.p>
+        {/* Standard mod — kılık kartı */}
+        {isStandard && disguiseSuspect && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="flex flex-col items-center mb-5"
+          >
+            <div
+              className="font-mono text-[9px] tracking-[0.3em] uppercase mb-1 px-2 py-0.5 rounded"
+              style={{ color: '#C0392B', background: 'rgba(8,8,14,0.85)', textShadow: '0 0 6px #C0392B, 0 0 14px #C0392BBB', filter: 'brightness(1.4)' }}
+            >
+              Katilin Yedek Kılığı
+            </div>
+            <SuspectCard
+              suspect={disguiseSuspect}
+              size={64}
+              showName
+              state={(game.killedSuspectIds ?? []).includes(disguiseSuspect.id) ? 'eliminated' : 'default'}
+            />
+          </motion.div>
+        )}
 
-        {/* Öldürülenler */}
+        {/* Kazanma/Kaybetme özet kutusu */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="w-full rounded-xl border mb-5 overflow-hidden"
+          style={{ borderColor: accentColor + '33', background: 'rgba(13,13,20,0.85)' }}
+        >
+          {/* Başlık bandı */}
+          <div
+            className="px-4 py-2 font-mono text-[9px] tracking-[0.35em] uppercase"
+            style={{ background: accentColor + '18', color: accentColor }}
+          >
+            Oyun Özeti
+          </div>
+
+          <div className="px-4 py-3 space-y-2">
+            {summaryLines.map((line, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span className="text-sm mt-0.5 shrink-0">{line.icon}</span>
+                <p className="font-body text-sm leading-snug" style={{ color: line.color }}>
+                  {line.text}
+                </p>
+              </div>
+            ))}
+
+            {/* Kill sayacı */}
+            <div className="pt-1 mt-1 border-t flex items-center gap-2" style={{ borderColor: '#2A2A3E' }}>
+              <span className="text-sm">📊</span>
+              <p className="font-mono text-[11px]" style={{ color: '#666676' }}>
+                Toplam can kaybı: <span style={{ color: '#9A9890' }}>{killCount} / {killLimit}</span>
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Kurbanlar */}
         {deceasedSuspects.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.55 }}
-            className="mb-6 w-full"
+            className="mb-5 w-full"
           >
             <div className="font-mono text-[9px] tracking-[0.3em] uppercase text-center mb-2" style={{ color: '#4A4A5E' }}>
               Kurbanlar
@@ -275,10 +398,9 @@ export default function EndScreen({ game, onReset }) {
           </motion.div>
         )}
 
-        {/* Ayraç */}
         <div className="w-24 h-px mb-6" style={{ background: accentColor + '44' }} />
 
-        {/* Yeni oyun butonu */}
+        {/* Yeni oyun */}
         <motion.button
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -287,11 +409,7 @@ export default function EndScreen({ game, onReset }) {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="w-full max-w-xs py-3 rounded-xl font-mono text-sm tracking-widest uppercase transition-all duration-200 border"
-          style={{
-            background: '#0D0D14',
-            borderColor: accentColor + '55',
-            color: accentColor,
-          }}
+          style={{ background: '#0D0D14', borderColor: accentColor + '55', color: accentColor }}
           onMouseEnter={e => e.currentTarget.style.borderColor = accentColor}
           onMouseLeave={e => e.currentTarget.style.borderColor = accentColor + '55'}
         >
