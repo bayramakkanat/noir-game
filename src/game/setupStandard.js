@@ -86,5 +86,8 @@ export function createStandardGame(humanRole) {
     aiExcludedSuspects: [],    // 2 kez başarısız → kalıcı dışla
     arrestFailCount: 0,
     lastArrestedId: null,
+    killerCandidates: null,
+    disguiseCandidates: null,
+    knownInnocentIds: [],     // Dedektifin elinden geçmiş kartlar — kesin katil değil
   };
 }

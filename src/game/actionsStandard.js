@@ -88,6 +88,16 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     )
   );
 
+  // Şüpheli kümesi güncelleme: katilin kimliği her zaman öldürülen kişinin
+  // ölüm anındaki canlı komşularından biridir. Önceki küme ile kesiştir.
+  const aliveNeighborIds = getAliveNeighborsOfSuspect(game.board, suspectId)
+    .map(n => n.cell.suspectId);
+  const prevCandidates = game.killerCandidates;
+  const intersected = prevCandidates == null
+    ? aliveNeighborIds
+    : prevCandidates.filter(id => aliveNeighborIds.includes(id));
+  const killerCandidates = intersected.length > 0 ? intersected : aliveNeighborIds;
+
   const killSite = killPos ? { r: killPos.r, c: killPos.c, suspectId } : null;
   const isExonerated = (game.publicExonerated ?? []).includes(suspectId);
 
@@ -99,6 +109,7 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     killedSuspectIds: [...(game.killedSuspectIds ?? []), suspectId],
     killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
     publicExonerated: (game.publicExonerated ?? []).filter(id => id !== suspectId),
+    killerCandidates,
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
@@ -155,7 +166,7 @@ export function applyStandardDisguise(game) {
     disguiseSuspectId: identitySuspectId,
   };
 
-  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, aiFailedArrests: {} };
+  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, aiFailedArrests: {}, killerCandidates: game.disguiseCandidates ?? null, disguiseCandidates: game.killerCandidates ?? null };
 
   if (game.humanRole === 'killer') {
     next = addLog(next, `⇄ Kılık değiştirdin. Yeni kimliğin: <b>${suspectName(disguiseSuspectId)}</b>.`);
@@ -194,6 +205,7 @@ export function applyStandardAccuse(game, targetSuspectId, killerIdentityId, ins
     arrestFailCount: (game.arrestFailCount ?? 0) + 1,
     aiFailedArrests: newFailed,
     aiExcludedSuspects: [...new Set(aiExcluded)],
+    consecutiveArrests: (game.consecutiveArrests ?? 0) + 1,
   };
   next = addLog(next, `🔗 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
   next = advanceTurn(next);
@@ -216,6 +228,9 @@ export function applyStandardExonerate(game, discardFromHandId, killerIdentityId
     inspector: { ...game.inspector, hand: [...hand, drawnId] },
     pendingAction: null,
     pendingExonerateDiscard: null,
+    consecutiveArrests: 0,
+    // Yeni çekilen kart da deste içinden geldiği için kesinlikle katilin kartı değil
+    knownInnocentIds: [...new Set([...(game.knownInnocentIds ?? []), drawnId])],
   };
 
   if (isDeceased) {
@@ -226,11 +241,36 @@ export function applyStandardExonerate(game, discardFromHandId, killerIdentityId
       publicExonerated: [...(game.publicExonerated ?? []), discardFromHandId],
     };
     const killerIsAdjacent = isIdentityAdjacentTo(next, killerIdentityId, discardFromHandId);
+    
+    const targetPos = positionOf(next.board, discardFromHandId);
+    const adjacentIds = [];
+    for (const r of next.board) {
+      for (const cell of r) {
+        if (cell && cell.status === 'alive') {
+          const pos = positionOf(next.board, cell.suspectId);
+          if (areAdjacent(pos, targetPos) && cell.suspectId !== discardFromHandId) {
+            adjacentIds.push(cell.suspectId);
+          }
+        }
+      }
+    }
+    
+    const allAliveIds = next.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId);
+    let prevCandidates = next.killerCandidates;
+    if (prevCandidates == null) prevCandidates = allAliveIds;
+    
+    let updatedCandidates = killerIsAdjacent
+      ? prevCandidates.filter(id => adjacentIds.includes(id))
+      : prevCandidates.filter(id => !adjacentIds.includes(id));
+      
+    updatedCandidates = updatedCandidates.filter(id => id !== discardFromHandId);
+
     next = {
       ...next,
       positiveKillerCanvases: killerIsAdjacent
         ? [...(next.positiveKillerCanvases ?? []), discardFromHandId]
         : (next.positiveKillerCanvases ?? []),
+      killerCandidates: updatedCandidates,
       pendingCanvas: {
         type: 'killer_answers',
         triggerSuspectId: discardFromHandId,
@@ -278,6 +318,7 @@ export function applyStandardShift(game, axis, index, direction) {
     lastShift: { axis, index, direction },
     pendingAction: null,
     pendingShift: null,
+    consecutiveArrests: 0,
   };
   next = addLog(next, `↔ Tahta kaydırıldı (${axisTr} ${index + 1}, ${dirTr}).`);
   next = advanceTurn(next);
@@ -299,6 +340,8 @@ export function applyStandardInspectorPickIdentity(game, cardSuspectId) {
     turn: TURN.KILLER,
     inspector: { ...game.inspector, secretIdentitySuspectId: cardSuspectId, hand },
     activeSide: game.humanRole === 'killer' ? 'human' : 'ai',
+    // Dedektifin elinde kalan kartlar kesinlikle katilin identity/disguise'i olamaz
+    knownInnocentIds: [...new Set([...(game.knownInnocentIds ?? []), ...hand])],
   };
 
   if (game.humanRole === 'inspector') {
