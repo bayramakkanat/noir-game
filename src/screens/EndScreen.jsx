@@ -15,7 +15,7 @@ function getCharacterImage(id) {
   return key ? characterImages[key].default : null;
 }
 
-function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp = null }) {
+export function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp = null }) {
   const img = getCharacterImage(suspect.id);
   return (
     <motion.div
@@ -93,7 +93,7 @@ function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp =
 }
 
 // Kazanma/kaybetme sebebini açıklayan metin bloğu
-function buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect }) {
+export function buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect }) {
   const { winReason, winner, humanRole, killCount, killedSuspectIds, gameMode, solveGuess } = game;
   const isStandard = gameMode === 'standard';
   const killerWon = winner === 'killer';
@@ -235,7 +235,7 @@ export default function EndScreen({ game, onReset }) {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-hidden"
+      className="min-h-screen flex flex-col items-center justify-center px-6 py-10 relative overflow-y-auto overflow-x-hidden"
       style={{
         backgroundImage: `url(${endBg})`,
         backgroundSize: 'cover',
@@ -245,7 +245,7 @@ export default function EndScreen({ game, onReset }) {
       <AmbientBackground variant={killerWon ? 'lobby' : 'setup'} density="full" className="z-[1]" />
       <div className="absolute inset-0 bg-black/60 z-[2]" />
       <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none z-[2]"
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none z-[4]"
         style={{ background: `radial-gradient(ellipse, ${glowColor} 0%, transparent 70%)` }}
       />
 
@@ -287,19 +287,23 @@ export default function EndScreen({ game, onReset }) {
           {playerWon ? '✦ Sen Kazandın ✦' : '✦ Sen Kaybettin ✦'}
         </motion.div>
 
-        {/* Ana karakterler */}
-        <div className="flex items-end justify-center gap-6 mb-6">
-          {killerSuspect && (
-            <HeroCard
-              suspect={killerSuspect}
-              label="Katilin Kimliği"
-              labelColor='#C0392B'
-              dim={inspectorWon && game.winReason !== 'inspector_killed'}
-              stamp={inspectorWon ? 'caught' : 'escaped'}
-            />
-          )}
+        {/* Container for Columns */}
+        <div className="flex flex-col md:flex-row items-center md:items-start justify-center gap-8 md:gap-16 w-full max-w-4xl mt-4">
+          
+          {/* Left Column: Characters */}
+          <div className="flex flex-col items-center">
+            <div className="flex items-end justify-center gap-4 md:gap-6 mb-6">
+              {killerSuspect && (
+                <HeroCard
+                  suspect={killerSuspect}
+                  label="Katilin Kimliği"
+                  labelColor='#C0392B'
+                  dim={inspectorWon && game.winReason !== 'inspector_killed'}
+                  stamp={inspectorWon ? 'caught' : 'escaped'}
+                />
+              )}
 
-          <motion.div
+              <motion.div
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.35, type: 'spring' }}
@@ -309,20 +313,20 @@ export default function EndScreen({ game, onReset }) {
             vs
           </motion.div>
 
-          {inspectorSuspect && (
-            <HeroCard
-              suspect={inspectorSuspect}
-              label="Dedektif"
-              labelColor={inspectorWon ? '#4090C8' : '#888898'}
-              dim={killerWon && game.winReason !== 'inspector_killed'}
-              stamp={inspectorStamp}
-            />
-          )}
-        </div>
+              {inspectorSuspect && (
+                <HeroCard
+                  suspect={inspectorSuspect}
+                  label="Dedektif"
+                  labelColor={inspectorWon ? '#4090C8' : '#888898'}
+                  dim={killerWon && game.winReason !== 'inspector_killed'}
+                  stamp={inspectorStamp}
+                />
+              )}
+            </div>
 
-        {/* Standard mod — kılık kartı */}
-        {isStandard && disguiseSuspect && (
-          <motion.div
+            {/* Standard mod — kılık kartı */}
+            {isStandard && disguiseSuspect && (
+              <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
@@ -342,9 +346,12 @@ export default function EndScreen({ game, onReset }) {
             />
           </motion.div>
         )}
+        </div>
 
-        {/* Kazanma/Kaybetme özet kutusu */}
-        <motion.div
+        {/* Right Column: Summary, Victims, Button */}
+        <div className="flex flex-col items-center md:items-stretch flex-1 w-full max-w-md">
+          {/* Kazanma/Kaybetme özet kutusu */}
+          <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
@@ -398,23 +405,25 @@ export default function EndScreen({ game, onReset }) {
           </motion.div>
         )}
 
-        <div className="w-24 h-px mb-6" style={{ background: accentColor + '44' }} />
+            <div className="w-24 h-px mb-6 md:mb-8" style={{ background: accentColor + '44' }} />
 
-        {/* Yeni oyun */}
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.65 }}
-          onClick={onReset}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full max-w-xs py-3 rounded-xl font-mono text-sm tracking-widest uppercase transition-all duration-200 border"
-          style={{ background: '#0D0D14', borderColor: accentColor + '55', color: accentColor }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = accentColor}
-          onMouseLeave={e => e.currentTarget.style.borderColor = accentColor + '55'}
-        >
-          Yeni Oyun
-        </motion.button>
+            {/* Yeni oyun */}
+            <motion.button
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65 }}
+              onClick={onReset}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full py-3 rounded-xl font-mono text-sm tracking-widest uppercase transition-all duration-200 border"
+              style={{ background: '#0D0D14', borderColor: accentColor + '55', color: accentColor }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = accentColor}
+              onMouseLeave={e => e.currentTarget.style.borderColor = accentColor + '55'}
+            >
+              Yeni Oyun
+            </motion.button>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

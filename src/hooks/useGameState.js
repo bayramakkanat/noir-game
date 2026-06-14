@@ -82,32 +82,34 @@ export function useGameState() {
     });
   }, []);
 
-  const executeBoardAction = useCallback((r, c) => {
+  const executeBoardAction = useCallback((r, c, actionOverride) => {
     setGame((prev) => {
       if (!prev || prev.gameOver || prev.activeSide !== 'human') return prev;
       const secrets = getActingSecrets(prev);
       const suspectId = prev.board[r]?.[c]?.suspectId;
       if (suspectId == null) return prev;
       const isStandard = prev.gameMode === GAME_MODE.STANDARD;
+      
+      const actionToExecute = actionOverride || prev.pendingAction;
 
-      if (prev.pendingAction === 'kill') {
+      if (actionToExecute === 'kill') {
         const fn = isStandard ? applyStandardKill : applyKill;
         const { ok, game: next } = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         if (ok) playKillSound();
         return next;
       }
       // Solve: kimlik seçimi (1. aşama)
-      if (prev.pendingAction === 'solve_identity') {
+      if (actionToExecute === 'solve_identity') {
         return { ...prev, pendingAction: 'solve_disguise', solveGuess: { identityId: suspectId } };
       }
 
       // Solve: kılık seçimi (2. aşama)
-      if (prev.pendingAction === 'solve_disguise') {
+      if (actionToExecute === 'solve_disguise') {
         if (suspectId === prev.solveGuess?.identityId) return prev; // aynı kart seçilemez
         const { ok, game: next } = applyStandardSolve(prev, prev.solveGuess.identityId, suspectId);
         return ok ? next : prev;
       }
-      if (prev.pendingAction === 'arrest') {
+      if (actionToExecute === 'arrest') {
         const fn = isStandard ? applyStandardAccuse : applyArrest;
         const { ok, game: next } = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         if (ok) {

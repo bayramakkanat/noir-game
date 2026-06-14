@@ -134,11 +134,26 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
       inspectorSecretId,
       suspectId
     );
+    const prevInspectorCandidates = next.inspectorCandidates ?? new Set(game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId));
+    const aliveNeighborIds = getAliveNeighborsOfSuspect(game.board, suspectId).map(n => n.cell.suspectId);
+    let newInspectorCandidates;
+    
+    if (inspectorIsAdjacent) {
+      // Dedektif komşu: Adaylar cesedin komşularıyla kesişmeli
+      newInspectorCandidates = Array.from(prevInspectorCandidates).filter(id => aliveNeighborIds.includes(id));
+      if (newInspectorCandidates.length === 0) newInspectorCandidates = aliveNeighborIds; // Fallback
+    } else {
+      // Dedektif komşu DEĞİL: Cesedin komşuları adaylıktan ÇIKARILMALI
+      newInspectorCandidates = Array.from(prevInspectorCandidates).filter(id => !aliveNeighborIds.includes(id));
+      if (newInspectorCandidates.length === 0) newInspectorCandidates = Array.from(prevInspectorCandidates); // Fallback
+    }
+
     next = {
       ...next,
       positiveInspectorCanvases: inspectorIsAdjacent
         ? [...(next.positiveInspectorCanvases ?? []), suspectId]
         : (next.positiveInspectorCanvases ?? []),
+      inspectorCandidates: new Set(newInspectorCandidates),
       pendingCanvas: {
         type: 'inspector_answers',
         triggerSuspectId: suspectId,
@@ -198,6 +213,11 @@ export function applyStandardAccuse(game, targetSuspectId, killerIdentityId, ins
     ? [...(game.aiExcludedSuspects ?? []), targetSuspectId]
     : (game.aiExcludedSuspects ?? []);
 
+  // Katil (ve AI), dedektifin kimleri tutukladığına bakarak onun yerini daraltır. (Dedektif mecburen komşusudur)
+  const aliveNeighborIds = getAliveNeighborsOfSuspect(game.board, targetSuspectId).map(n => n.cell.suspectId);
+  const prevInspectorCandidates = game.inspectorCandidates ?? new Set(game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId));
+  const newInspectorCandidates = Array.from(prevInspectorCandidates).filter(id => aliveNeighborIds.includes(id));
+
   let next = {
     ...game,
     pendingAction: null,
@@ -206,6 +226,7 @@ export function applyStandardAccuse(game, targetSuspectId, killerIdentityId, ins
     aiFailedArrests: newFailed,
     aiExcludedSuspects: [...new Set(aiExcluded)],
     consecutiveArrests: (game.consecutiveArrests ?? 0) + 1,
+    inspectorCandidates: new Set(newInspectorCandidates.length > 0 ? newInspectorCandidates : aliveNeighborIds),
   };
   next = addLog(next, `🔗 <b>${name}</b> tutuklandı ama katil değil. Tur devam ediyor.`);
   next = advanceTurn(next);

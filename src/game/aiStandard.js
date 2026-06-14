@@ -11,7 +11,7 @@
 
 import { PHASE, TURN, STANDARD_KILLER_WIN_DEATH_COUNT } from './constants.js';
 import { getKillTargets, getArrestTargets, canShift } from './validators.js';
-import { shiftRow, shiftColumn, positionOf, getAliveNeighborsOfSuspect } from './board.js';
+import { shiftRow, shiftColumn, positionOf, getAliveNeighborsOfSuspect, getNeighborsOfSuspect } from './board.js';
 import {
   applyStandardKill,
   applyStandardDisguise,
@@ -262,35 +262,114 @@ export function runStandardAiTurn(game) {
 
   // ── Katil turu ──
   if (game.turn === TURN.KILLER) {
-    const roll = Math.random();
     const killerIdentityId = game.killer.identitySuspectId;
-    const targets = getKillTargets(game, killerIdentityId);
+    const disguiseSuspectId = game.killer.disguiseSuspectId;
+    const isDisguiseDead = (game.killedSuspectIds ?? []).includes(disguiseSuspectId);
+    
+    // Dedektif adayları
+    const allAliveIds = game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId);
+    const inspectorCandidates = game.inspectorCandidates ?? new Set(allAliveIds);
+    const publicExonerated = game.publicExonerated ?? [];
+    
+    // Hedefleri puanla
+    const targets = getKillTargets(game, killerIdentityId).map(t => {
+      let score = 0;
+      if (inspectorCandidates.has(t.suspectId)) {
+        // Eğer bu kişi dedektif adayıysa ve aday havuzu çok küçükse (örneğin <=3), DEVASA puan!
+        score += inspectorCandidates.size <= 3 ? 1000 : 100;
+      }
+      if (publicExonerated.includes(t.suspectId)) {
+        // Masumları öldürmek rozet (badge) kontrolü tetikler ve dedektifin yerini ele verir
+        score += 500;
+      }
+      return { ...t, score };
+    }).sort((a, b) => b.score - a.score);
 
-    // Öldür (sabit %45)
-    if (roll < 0.45 && targets.length) {
-      const t = pickRandom(targets);
-      return applyStandardKill(game, t.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
+    // Kılık Değiştirme (Disguise) Değerlendirmesi
+    let shouldDisguise = false;
+    if (!isDisguiseDead) {
+      // 1. Eğer Disguise kimliğinin etrafında bir "Dedektif Adayı" varsa ve şu anki kimliğimizin yoksa
+      const disguiseTargets = getKillTargets(game, disguiseSuspectId);
+      const disguiseHasInspector = disguiseTargets.some(t => inspectorCandidates.has(t.suspectId));
+      const currentHasInspector = targets.some(t => inspectorCandidates.has(t.suspectId));
+      
+      if (disguiseHasInspector && !currentHasInspector && inspectorCandidates.size <= 3) {
+        shouldDisguise = true; // Oyunu kazanma şansı var!
+      }
+      
+      // 2. Eğer şu anki kimliğimizin etrafı ceset kaynıyorsa (Dikkat çekiyorsak) ve yedek kılığımız daha temizse
+      const currentDeadCount = getNeighborsOfSuspect(game.board, killerIdentityId).filter(n => n.cell.status === 'dead').length;
+      const disguiseDeadCount = getNeighborsOfSuspect(game.board, disguiseSuspectId).filter(n => n.cell.status === 'dead').length;
+      
+      if (currentDeadCount >= 3 && disguiseDeadCount < 2) {
+        shouldDisguise = true; // Kaçış!
+      }
     }
 
-    // Kılık değiştir — standart modda: yedek ölmediyse geçiş yap
-    const disguiseDead = (game.killedSuspectIds ?? []).includes(game.killer.disguiseSuspectId);
-    if (roll < 0.45 + cfg.killerDisguiseP && !disguiseDead) {
+    // Karar Ağacı
+    if (shouldDisguise && Math.random() < 0.8) {
       const { ok, game: next } = applyStandardDisguise(game);
       if (ok) return next;
     }
 
-    // Kaydır
+    // Yüksek puanlı hedef varsa öldür
+    if (targets.length > 0) {
+      const bestScore = targets[0].score;
+      if (bestScore > 0 || Math.random() < 0.6) {
+        const bestTargets = targets.filter(t => t.score === bestScore);
+        const t = pickRandom(bestTargets);
+        return applyStandardKill(game, t.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
+      }
+    }
+
+    // Kaydır (Avlanma veya Kaçış)
     const shifts = allShiftMoves(game);
-    if (roll < 0.45 + cfg.killerDisguiseP + cfg.killerShiftP && shifts.length) {
-      const s = pickRandom(shifts);
+    if (shifts.length > 0 && Math.random() < 0.7) {
+      // Akıllı kaydırma: Eğer dedektifin yerini daralttıysak ona yaklaş, yoksa rastgele kaydır
+      let bestShift = null;
+      let bestShiftScore = -Infinity;
+      
+      if (inspectorCandidates.size <= 3) {
+        for (const s of shifts) {
+          const tempBoard = s.axis === 'row' 
+            ? shiftRow(game.board, s.index, s.direction)
+            : shiftColumn(game.board, s.index, s.direction);
+            
+          const currentPos = positionOf(tempBoard, killerIdentityId);
+          if (!currentPos) continue;
+          
+          let shiftScore = 0;
+          for (const candId of inspectorCandidates) {
+            const candPos = positionOf(tempBoard, candId);
+            if (candPos) {
+              const dist = chebyshev(currentPos.r, currentPos.c, candPos.r, candPos.c);
+              if (dist <= 1) shiftScore += 100; // Dibine girdik!
+              else shiftScore -= dist * 10; // Yaklaşmaya çalış
+            }
+          }
+          if (shiftScore > bestShiftScore) {
+            bestShiftScore = shiftScore;
+            bestShift = s;
+          }
+        }
+      }
+      
+      const s = bestShift || pickRandom(shifts);
       return applyStandardShift(game, s.axis, s.index, s.direction).game;
     }
 
-    // Fallback: yine öldür
-    if (targets.length) {
+    // Fallback öldür
+    if (targets.length > 0) {
       const t = pickRandom(targets);
       return applyStandardKill(game, t.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
     }
+    
+    // Hiçbir şey yapamazsa (etrafında adam yok, kaydırma da yapmıyor) Kılık değiştirsin
+    if (!isDisguiseDead) {
+      const { ok, game: next } = applyStandardDisguise(game);
+      if (ok) return next;
+    }
+
     return game;
   }
 

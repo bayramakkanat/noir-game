@@ -104,6 +104,14 @@ export function getAliveNeighborsOfSuspect(board, suspectId) {
   return getAliveNeighborsAt(board, pos.r, pos.c);
 }
 
+export function getNeighborsOfSuspect(board, suspectId) {
+  const pos = positionOf(board, suspectId);
+  if (!pos) return [];
+  return getNeighborCoords(board, pos.r, pos.c)
+    .map(({ r, c }) => ({ r, c, cell: board[r][c] }))
+    .filter(n => n.cell !== null);
+}
+
 export function countDeceased(board) {
   let n = 0;
   for (const row of board) {

@@ -3,7 +3,9 @@ import { useFullscreen } from '../hooks/useFullscreen.js';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { PHASE, TURN, CELL_STATUS, GAME_MODE } from '../game/constants.js';
 import { SUSPECTS } from '../data/suspects.js';
+import gameOverBg from '../assets/game_over_bg.png';
 import SuspectCard from '../components/SuspectCard.jsx';
+import { buildWinSummary, HeroCard } from './EndScreen.jsx';
 
 
 /* ── Aksiyon buton stilleri (desktop geniş + mobil kompakt) ── */
@@ -408,7 +410,44 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
       actions.pickInspectorIdentity(cell.suspectId);
       return;
     }
-    if (['kill', 'arrest', 'solve_identity', 'solve_disguise'].includes(pendingAction)) actions.executeBoardAction(r, c);
+    
+    // Eğer oyuncu bir aksiyon butonu seçmişse (Örn: Çöz, Kaydır, Öldür) önce onu uygula
+    if (['kill', 'arrest', 'solve_identity', 'solve_disguise'].includes(pendingAction)) {
+      actions.executeBoardAction(r, c);
+      return;
+    }
+
+    // --- QUICK ACTIONS (Hızlı Dokunma / Kısayol) ---
+    // Hiçbir buton seçili değilse ve tahtada bir karaktere dokunulmuşsa
+    if (!pendingAction) {
+      // Katil rolü için
+      if (humanRole === 'killer' && turn === TURN.KILLER) {
+        // Yedek kılığa tıklandıysa -> Kılık Değiştir (Disguise)
+        if (game.gameMode === GAME_MODE.STANDARD && cell.suspectId === game.killer.disguiseSuspectId) {
+          actions.executeDisguise();
+          return;
+        }
+        // Komşu, canlı birine tıklandıysa -> Öldür (Kill)
+        if (actions.isCoordTargetable(game, r, c, 'kill', secrets)) {
+          actions.executeBoardAction(r, c, 'kill');
+          return;
+        }
+      }
+      
+      // Dedektif rolü için
+      if (humanRole === 'inspector' && turn === TURN.INSPECTOR) {
+        // Komşu, canlı birine tıklandıysa -> Tutukla (Arrest)
+        if (actions.isCoordTargetable(game, r, c, 'arrest', secrets)) {
+          actions.executeBoardAction(r, c, 'arrest');
+          return;
+        }
+        // Eldeki masum kartlarından birine tahtada tıklandıysa -> Temize Çıkar (Exonerate)
+        if (game.inspector.hand.includes(cell.suspectId)) {
+          actions.completeExonerate(cell.suspectId);
+          return;
+        }
+      }
+    }
   }
 
   // Wrap-around kartlar (tahta sınırından dönenler) daha yüksek z-index ile uçsun
@@ -455,6 +494,31 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
         <div className="absolute inset-0 rounded-lg ring-[3px] ring-red-500 pointer-events-none z-20"
           style={{ boxShadow: '0 0 12px rgba(239,68,68,0.6)' }} />
       )}
+      
+      {/* OYUN SONU: Gizli kimlikleri açıkça göster */}
+      {game.gameOver && (
+        <>
+          {cell.suspectId === game.killer?.identitySuspectId && (
+            <div className="absolute inset-0 rounded-lg border-[3px] border-red-500 pointer-events-none z-30 animate-pulse"
+                 style={{ boxShadow: '0 0 10px rgba(239,68,68,0.5), inset 0 0 8px rgba(239,68,68,0.3)' }} />
+          )}
+          {game.gameMode === GAME_MODE.STANDARD && cell.suspectId === game.killer?.disguiseSuspectId && (
+            <div className="absolute inset-0 rounded-lg border-[3px] border-purple-500 pointer-events-none z-30 animate-pulse"
+                 style={{ boxShadow: '0 0 10px rgba(168,85,247,0.5), inset 0 0 8px rgba(168,85,247,0.3)' }} />
+          )}
+          {cell.suspectId === game.inspector?.secretIdentitySuspectId && (
+            <div className="absolute inset-0 rounded-lg border-[3px] border-blue-500 pointer-events-none z-30 animate-pulse"
+                 style={{ boxShadow: '0 0 10px rgba(59,130,246,0.5), inset 0 0 8px rgba(59,130,246,0.3)' }} />
+          )}
+          
+          {/* Dedektifin elinde kalan masum kartlarını göster */}
+          {game.inspector?.hand?.includes(cell.suspectId) && (
+            <div className="absolute inset-0 rounded-lg border-[2px] border-green-500/70 pointer-events-none z-30"
+                 style={{ boxShadow: 'inset 0 0 8px rgba(34,197,94,0.2)' }} />
+          )}
+        </>
+      )}
+
       {/* Tutuklama flash efekti — mavi titreme */}
       {isArrestFlash && (
         <motion.div
@@ -469,18 +533,21 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
           }}
         />
       )}
-      <SuspectCard
-        suspect={suspect(cell.suspectId)}
-        state={cardState}
-        size={cellSize}
-        onClick={handleClick}
-        showName
-        playerRole={humanRole}
-        nameFontSize={Math.max(10, Math.round(cellSize * 0.15))}
-        canvasAdjacent={isCanvasAdjacent}
-        canvasTypes={canvasTypes}
-        isDisguise={isDisguise}
-      />
+      
+      <div className="relative z-10">
+        <SuspectCard
+          suspect={suspect(cell.suspectId)}
+          state={cardState}
+          size={cellSize}
+          onClick={handleClick}
+          showName
+          playerRole={humanRole}
+          nameFontSize={Math.max(10, Math.round(cellSize * 0.15))}
+          canvasAdjacent={isCanvasAdjacent}
+          canvasTypes={canvasTypes}
+          isDisguise={isDisguise}
+        />
+      </div>
     </motion.div>
   );
 }
@@ -883,6 +950,106 @@ function ToastNotification({ logs }) {
   );
 }
 
+// ─── Oyun Sonu Paneli ────────────────────────────────────────────────────────
+function GameOverPanel({ game, actions, onReset, onQuit }) {
+  const killerWon    = game.winner === 'killer';
+  const playerWon    = (game.humanRole === 'killer' && killerWon) || (game.humanRole === 'inspector' && !killerWon);
+  const accentColor  = killerWon ? '#C0392B' : '#4090C8';
+  
+  const killerSuspect    = SUSPECTS.find(s => s.id === game.killer.identitySuspectId);
+  const inspectorSuspect = SUSPECTS.find(s => s.id === game.inspector.secretIdentitySuspectId);
+  const isStandard       = game.gameMode === 'standard';
+  const disguiseSuspect  = isStandard ? SUSPECTS.find(s => s.id === game.killer.disguiseSuspectId) : null;
+  
+  const summaryLines = buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect });
+  const inspectorWon = game.winner === 'inspector';
+  const inspectorStamp = inspectorWon ? (game.winReason === 'solve_correct' ? 'solved' : 'caught') : 'dead';
+
+  return (
+    <div 
+      className="flex-1 flex flex-col p-5 overflow-y-auto w-full max-w-sm mx-auto relative" 
+      style={{ 
+        scrollbarWidth: 'thin', 
+        scrollbarColor: '#2A2A3E transparent',
+        backgroundImage: `linear-gradient(to bottom, rgba(9,9,15,0.7), rgba(9,9,15,0.95)), url(${gameOverBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center'
+      }}
+    >
+      <div className="relative z-10 text-center mb-5 mt-2">
+        <div className="font-mono text-[10px] tracking-[0.4em] uppercase mb-2" style={{ color: accentColor }}>
+          — Dava Kapandı —
+        </div>
+        <h2 className="font-display text-3xl font-bold mb-1" style={{ color: accentColor, textShadow: `0 0 20px ${accentColor}44` }}>
+          {killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI'}
+        </h2>
+        <div className={`font-mono text-xs tracking-widest uppercase mt-2 ${playerWon ? 'text-[#D4A017]' : 'text-[#888898]'}`}>
+          {playerWon ? '✦ Sen Kazandın ✦' : '✦ Sen Kaybettin ✦'}
+        </div>
+      </div>
+
+      <div className="relative z-10 flex flex-wrap justify-center gap-4 sm:gap-6 mb-5">
+        {killerSuspect && (
+          <HeroCard
+            suspect={killerSuspect}
+            label="Katilin Kimliği"
+            labelColor='#C0392B'
+            dim={inspectorWon && game.winReason !== 'inspector_killed'}
+            stamp={inspectorWon ? 'caught' : 'escaped'}
+          />
+        )}
+        {inspectorSuspect && (
+          <HeroCard
+            suspect={inspectorSuspect}
+            label="Dedektif"
+            labelColor={inspectorWon ? '#4090C8' : '#888898'}
+            dim={killerWon && game.winReason !== 'inspector_killed'}
+            stamp={inspectorStamp}
+          />
+        )}
+      </div>
+
+      <div className="relative z-10 w-full rounded-xl border mb-6 overflow-hidden flex-shrink-0" style={{ borderColor: accentColor + '33', background: 'rgba(13,13,20,0.85)' }}>
+        <div className="px-4 py-2 font-mono text-[9px] tracking-[0.35em] uppercase" style={{ background: accentColor + '18', color: accentColor }}>
+          Oyun Özeti
+        </div>
+        <div className="px-4 py-4 space-y-3">
+          {summaryLines.map((line, i) => (
+            <div key={i} className="flex items-start gap-3">
+              <span className="text-base mt-0.5 shrink-0">{line.icon}</span>
+              <p className="font-body text-[13px] leading-relaxed" style={{ color: line.color }}>
+                {line.text}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-auto pt-4 pb-2 space-y-3">
+        <motion.button
+          onClick={onReset}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full py-3.5 rounded-xl font-mono text-sm tracking-widest uppercase transition-all duration-200 border"
+          style={{ background: '#0D0D14', borderColor: accentColor + '55', color: accentColor }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = accentColor}
+          onMouseLeave={e => e.currentTarget.style.borderColor = accentColor + '55'}
+        >
+          Yeni Oyun
+        </motion.button>
+        {onQuit && (
+          <button
+            onClick={onQuit}
+            className="w-full py-2.5 rounded-xl font-mono text-[10px] tracking-widest uppercase text-[#6B6B85] hover:text-white transition-colors"
+          >
+            Ana Menüye Dön
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
 function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, isMultiplayer }) {
   const [showMobileLog, setShowMobileLog] = React.useState(false);
@@ -1251,7 +1418,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
 }
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
-export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
+export default function GameScreen({ game, actions, onQuit, onReset, isMultiplayer }) {
   if (!game || !game.board) {
     return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
   }
@@ -1279,14 +1446,30 @@ export default function GameScreen({ game, actions, onQuit, isMultiplayer }) {
           <BoardWithArrows game={game} actions={actions} cellSize={cellSize} activeRows={activeRows} activeCols={activeCols} />
           <ToastNotification logs={game.logs} />
         </div>
-        <ActionPanel
-          game={game}
-          actions={actions}
-          onQuit={onQuit}
-          panelWidth={panelWidth}
-          cardSize={cardSize}
-          isMultiplayer={isMultiplayer}
-        />
+        {game.gameOver ? (
+          <div
+            className="
+              w-full lg:static
+              fixed bottom-0 left-0 right-0 z-40
+              max-h-[50vh] lg:max-h-none overflow-y-auto lg:overflow-hidden
+              border-t lg:border-t-0 lg:border-l border-noir-border/40
+              flex flex-col bg-[#09090F] lg:min-h-screen
+              shadow-[0_-10px_40px_rgba(0,0,0,0.8)] lg:shadow-none
+            "
+            style={{ width: panelWidth }}
+          >
+            <GameOverPanel game={game} actions={actions} onReset={onReset} onQuit={onQuit} />
+          </div>
+        ) : (
+          <ActionPanel
+            game={game}
+            actions={actions}
+            onQuit={onQuit}
+            panelWidth={panelWidth}
+            cardSize={cardSize}
+            isMultiplayer={isMultiplayer}
+          />
+        )}
       </div>
       <ExonerateOverlay game={game} actions={actions} cardSize={cardSize} />
 

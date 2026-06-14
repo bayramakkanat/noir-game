@@ -34,18 +34,15 @@ function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageSc
       type="button"
       onClick={onClick}
       className={`
-        group relative w-full flex items-center gap-3.5 p-3 sm:p-3.5 rounded-xl text-left
+        group relative w-full flex items-center gap-4 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-3xl text-left
         border backdrop-blur-md transition-all duration-300
         hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]
         ${styles.card}
       `}
     >
       <div
-        className={`
-          relative flex-shrink-0 w-[4.25rem] h-[4.25rem] sm:w-[4.75rem] sm:h-[4.75rem] rounded-lg overflow-hidden ring-1
-          transition-all duration-300 group-hover:scale-[1.04]
-          ${styles.thumb}
-        `}
+        className="relative flex-shrink-0 rounded-2xl overflow-hidden transition-all duration-300 group-hover:scale-[1.04]"
+        style={{ width: 'clamp(4.5rem, 10vh, 7.5rem)', height: 'clamp(4.5rem, 10vh, 7.5rem)' }}
       >
         <img
           src={image}
@@ -56,6 +53,9 @@ function ModeOption({ onClick, image, imageAlt, title, subtitle, accent, imageSc
               ? { transform: `scale(${imageScale})`, transformOrigin: 'center center' }
               : undefined
           }
+        />
+        <div
+          className="absolute inset-0 rounded-2xl pointer-events-none"
         />
         <div className="absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-transparent pointer-events-none" />
       </div>
@@ -122,7 +122,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
       </div>
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-md">
-        <div className="text-center mb-10 sm:mb-12 anim-fade-in">
+        <div className="text-center mb-[3vh] anim-fade-in">
           <div className="font-mono text-[10px] tracking-[0.35em] text-white/35 uppercase mb-3">
             1940 · Dedüksiyon Oyunu
           </div>
@@ -142,7 +142,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
           </p>
         </div>
 
-        <div className="w-full flex rounded-xl overflow-hidden border border-white/[0.08] anim-fade-in mb-4" style={{ animationDelay: '0.1s' }}>
+        <div className="w-full flex rounded-3xl overflow-hidden border border-white/[0.08] anim-fade-in mb-[2vh]" style={{ animationDelay: '0.1s' }}>
             <button
               type="button"
               onClick={() => setGlobalGameMode('classic')}
@@ -167,21 +167,14 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
             </button>
           </div>
 
-        <div
-          className="w-full rounded-2xl border border-white/[0.06] bg-black/30 backdrop-blur-xl p-3 sm:p-4 shadow-[0_16px_48px_rgba(0,0,0,0.45)] anim-fade-in"
-          style={{ animationDelay: '0.15s' }}
-        >
-          <p className="font-mono text-[9px] tracking-[0.22em] text-white/25 uppercase px-1 pb-3">
-            Oyun modu seç
-          </p>
-          <div className="flex flex-col gap-2.5">
+        <div className="w-full flex flex-col gap-[1.5vh] anim-fade-in" style={{ animationDelay: '0.15s' }}>
             <ModeOption
               accent="red"
               image={tekImg}
               imageAlt="Tek Oyunculu"
               title="Tek Oyunculu"
               subtitle="Yapay zekaya karşı"
-              imageScale={1.14}
+              imageScale={1}
               onClick={() => onSelect('solo')}
             />
             <ModeOption
@@ -193,12 +186,11 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
               onClick={() => onSelect('multi')}
             />
           </div>
-        </div>
 
         <button
           type="button"
           onClick={() => setRulesOpen(true)}
-          className="mt-5 w-full py-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] font-mono text-[10px] tracking-[0.2em] text-white/45 uppercase hover:text-white/70 hover:border-white/15 hover:bg-white/[0.06] transition-all anim-fade-in"
+          className="mt-[2vh] w-full py-2.5 rounded-3xl border border-white/[0.08] bg-white/[0.03] font-mono text-[10px] tracking-[0.2em] text-white/45 uppercase hover:text-white/70 hover:border-white/15 hover:bg-white/[0.06] transition-all anim-fade-in"
           style={{ animationDelay: '0.28s' }}
         >
           Nasıl oynanır?
@@ -234,7 +226,7 @@ export default function App() {
   }
 
   if (mode === 'solo') {
-    const soloScreen = !solo.game ? 'setup' : solo.game.gameOver ? 'end' : 'game';
+    const soloScreen = !solo.game ? 'setup' : 'game'; // gameOver olsa bile 'game' de kalır
     return (
       <div className="grain">
         {soloScreen === 'setup' && (
@@ -244,6 +236,7 @@ export default function App() {
           <GameScreen
             game={solo.game}
             onQuit={() => { solo.resetGame(); setMode('menu'); }}
+            onReset={() => { solo.startGame(solo.game.humanRole, globalGameMode); }}
             actions={{
               setPending: solo.setPending,
               cancelPending: solo.cancelPending,
@@ -265,24 +258,13 @@ export default function App() {
             }}
           />
         )}
-        {soloScreen === 'end' && (
-          <EndScreen game={solo.game} onReset={() => { solo.resetGame(); setMode('menu'); }} />
-        )}
       </div>
     );
   }
 
   // MULTIPLAYER
   if (mode === 'multi') {
-    if (multi.game?.gameOver) {
-      return (
-        <div className="grain">
-          <EndScreen game={multi.game} onReset={() => { multi.leaveRoom(); setMode('menu'); }} />
-        </div>
-      );
-    }
-
-    if (multi.status !== 'playing') {
+    if (multi.status !== 'playing' && (!multi.game || !multi.game.gameOver)) {
       return (
         <div className="grain">
           <LobbyScreen
@@ -320,6 +302,7 @@ export default function App() {
             isCoordTargetable: multi.isCoordTargetable,
           }}
           onQuit={() => { multi.leaveRoom(); setMode('menu'); }}
+          onReset={() => { multi.leaveRoom(); setMode('menu'); }}
           isMultiplayer={true}
           myRole={multi.myRole}
           roomId={multi.roomId}
