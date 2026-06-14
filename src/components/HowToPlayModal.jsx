@@ -177,8 +177,7 @@ function StandardRules() {
         <ul className="list-disc pl-5 space-y-1.5 marker:text-blue-400/50">
           <li>
             <strong className="text-noir-text/85">Tutukla</strong> — Gizli kimliğinin komşularından birini (ya
-            da kendini) tutukla. Katilin o anki gizli kimliğiyse kazanırsın. Katilin{' '}
-            <em>yedek kılığını</em> tutuklarsan katil o kartı atar ama oyun devam eder.
+            da kendini) tutukla. Katilin o anki gizli kimliğiyse kazanırsın; değilse oyun devam eder.
           </li>
           <li>
             <strong className="text-green-400/80">Temize çıkar</strong> — Elindeki bir kanıt kartını tahtada
