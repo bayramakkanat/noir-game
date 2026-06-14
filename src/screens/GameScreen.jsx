@@ -963,7 +963,8 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
   
   const summaryLines = buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect });
   const inspectorWon = game.winner === 'inspector';
-  const inspectorStamp = inspectorWon ? (game.winReason === 'solve_correct' ? 'solved' : 'caught') : 'dead';
+  const killerStamp   = inspectorWon ? 'caught' : 'escaped';
+  const inspectorStamp = (killerWon && game.winReason === 'inspector_killed') ? 'killed' : null;
 
   return (
     <div 
@@ -994,8 +995,8 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
             suspect={killerSuspect}
             label="Katilin Kimliği"
             labelColor='#C0392B'
-            dim={inspectorWon && game.winReason !== 'inspector_killed'}
-            stamp={inspectorWon ? 'caught' : 'escaped'}
+            dim={inspectorWon}
+            stamp={killerStamp}
           />
         )}
         {inspectorSuspect && (

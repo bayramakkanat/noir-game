@@ -199,6 +199,9 @@ export default function EndScreen({ game, onReset }) {
 
   const killerSuspect    = SUSPECTS.find(s => s.id === game.killer.identitySuspectId);
   const inspectorSuspect = SUSPECTS.find(s => s.id === game.inspector.secretIdentitySuspectId);
+
+  // Güvenlik: katil ve dedektif aynı suspect ise dedektif kartını gösterme
+  const sameIdentity = killerSuspect?.id === inspectorSuspect?.id;
   const isStandard       = game.gameMode === 'standard';
   const disguiseSuspect  = isStandard ? SUSPECTS.find(s => s.id === game.killer.disguiseSuspectId) : null;
 
@@ -214,19 +217,10 @@ export default function EndScreen({ game, onReset }) {
   const headline = killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI';
 
   // Katil kartı için stamp
-  const killerStamp = (() => {
-    if (inspectorWon) {
-      if (game.winReason === 'wrong_solve') return null; // katil kartı yok stamp, dedektif yanlış tahmin → katil kazandı aslında bu branch olmaz ama güvenli
-      return 'caught';
-    }
-    return 'escaped';
-  })();
+  const killerStamp = inspectorWon ? 'caught' : 'escaped';
 
-  // İnspektör kartı için stamp
-  const inspectorStamp = (() => {
-    if (game.winReason === 'inspector_killed') return 'killed';
-    return null;
-  })();
+  // Dedektif kartı için stamp — sadece KATİL kazandı VE dedektifin kimliği öldürüldüyse
+  const inspectorStamp = (killerWon && game.winReason === 'inspector_killed') ? 'killed' : null;
 
   const summaryLines = buildWinSummary({ game, killerSuspect, inspectorSuspect, disguiseSuspect });
 
@@ -298,8 +292,8 @@ export default function EndScreen({ game, onReset }) {
                   suspect={killerSuspect}
                   label="Katilin Kimliği"
                   labelColor='#C0392B'
-                  dim={inspectorWon && game.winReason !== 'inspector_killed'}
-                  stamp={inspectorWon ? 'caught' : 'escaped'}
+                  dim={inspectorWon}
+                  stamp={killerStamp}
                 />
               )}
 
@@ -313,7 +307,7 @@ export default function EndScreen({ game, onReset }) {
             vs
           </motion.div>
 
-              {inspectorSuspect && (
+              {inspectorSuspect && !sameIdentity && (
                 <HeroCard
                   suspect={inspectorSuspect}
                   label="Dedektif"
