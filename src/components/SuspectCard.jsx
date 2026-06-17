@@ -23,6 +23,10 @@ export default function SuspectCard({
   canvasAdjacent = false,
   canvasTypes = [], // ['killer'], ['detective'], veya ['killer','detective']
   isDisguise = false,
+  isIdentityBadge = false,
+  identityRole = null,
+  endgameRole = null,
+  endgameDisguise = false,
 }) {
   const imageUrl = getCharacterImage(suspect.id);
   const svgMarkup = drawFace(suspect, size);
@@ -87,39 +91,6 @@ export default function SuspectCard({
             </>
           )}
 
-
-
-          {/* Mine badge */}
-          {state === 'mine' && (
-            <div className={`
-              absolute -top-2 -right-2 rounded-full p-1 shadow-lg border-[1.5px] border-[#0A0C0E] z-30
-              flex items-center justify-center pointer-events-none text-white
-              ${playerRole === 'killer' ? 'bg-[#C0392B]' : 'bg-noir-blue'}
-            `}>
-              {playerRole === 'killer' ? (
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6.92 5H5l9 9 1-.94m4.96 6.06-.84.84a.996.996 0 0 1-1.41 0l-3.12-3.12-2.68 2.66-1.41-1.41 1.42-1.42L3 7.75V3h4.75l8.92 8.92 1.42-1.42 1.41 1.41-2.67 2.67 3.12 3.12c.4.4.4 1.03.01 1.42z"/>
-                </svg>
-              ) : (
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                </svg>
-              )}
-            </div>
-          )}
-
-          {/* Disguise badge — Standart mod, sadece katil görür */}
-          {isDisguise && (
-            <div className="
-              absolute -top-2 -right-2 rounded-full p-1 shadow-lg border-[1.5px] border-[#0A0C0E] z-30
-              flex items-center justify-center pointer-events-none
-              bg-[#7B3FBE]
-            " style={{ boxShadow: '0 0 8px rgba(123,63,190,0.7)' }}>
-              <svg className="w-3.5 h-3.5" fill="rgba(255,255,255,0.85)" viewBox="0 0 24 24">
-                <path d="M6.92 5H5l9 9 1-.94m4.96 6.06-.84.84a.996.996 0 0 1-1.41 0l-3.12-3.12-2.68 2.66-1.41-1.41 1.42-1.42L3 7.75V3h4.75l8.92 8.92 1.42-1.42 1.41 1.41-2.67 2.67 3.12 3.12c.4.4.4 1.03.01 1.42z"/>
-              </svg>
-            </div>
-          )}
           {/* İsim Overlay (Ön Yüz) */}
           {showName && (
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#09090F] via-[#09090F]/80 to-transparent pt-6 pb-1 px-1 text-center pointer-events-none rounded-b-md">
@@ -146,11 +117,11 @@ export default function SuspectCard({
             transform: 'rotateY(180deg)',
             width: '100%',
             height: '100%',
-            background: 'linear-gradient(135deg, #1a0a0a 0%, #0f0608 60%, #130808 100%)',
+            background: 'linear-gradient(135deg, #3a1c1c 0%, #221013 60%, #281010 100%)',
           }}
         >
           {/* Karakter görseli — eskisinden daha açık ve kırmızımsı */}
-          <div className="absolute inset-0 grayscale" style={{ opacity: 0.35 }}>
+          <div className="absolute inset-0 grayscale" style={{ opacity: 0.75 }}>
             {imageUrl ? (
               <img src={imageUrl} className="w-full h-full object-cover object-top" draggable={false} />
             ) : null}
@@ -173,17 +144,17 @@ export default function SuspectCard({
               <path d="M 12 10 Q 30 30 50 50 T 88 92 Q 82 98 72 88 T 35 48 Q 10 20 12 10 Z" />
               {/* Çapraz 2 (Sağ üst - Sol alt) */}
               <path d="M 88 10 Q 70 30 50 50 T 12 92 Q 18 98 28 88 T 65 48 Q 90 20 88 10 Z" />
-              
+
               {/* Akıntılar / Damlalar */}
               <path d="M 32 75 Q 32 95 33 98 Q 34 95 34 76 Z" />
               <circle cx="33" cy="99" r="1.5" />
-              
+
               <path d="M 70 80 Q 70 92 71 95 Q 72 92 72 81 Z" />
               <circle cx="71" cy="96" r="1.2" />
 
               <path d="M 46 65 Q 46 78 46.5 80 Q 47 78 47 66 Z" />
               <circle cx="46.5" cy="81" r="0.8" />
-              
+
               {/* Sıçramalar */}
               <circle cx="18" cy="22" r="1.5" />
               <circle cx="85" cy="25" r="1.8" />
@@ -214,7 +185,40 @@ export default function SuspectCard({
 
       </motion.div>
 
-      {/* Badge'ler — 3D dönüşün DIŞINDA, pozisyon sabit kalır */}
+      {/* Badge'ler — 3D dönüşün DIŞINDA, pozisyon sabit kalır, hover büyümesi ezmez (z-[60]) */}
+
+      {/* Mine badge — büyüteç (dedektif) / kılıç (katil) */}
+      {(state === 'mine' || isIdentityBadge) && (
+        <div className={`
+          absolute -top-2 -right-2 rounded-full p-1 shadow-lg border-[1.5px] border-[#0A0C0E] z-[60]
+          flex items-center justify-center pointer-events-none text-white
+          ${(identityRole || playerRole) === 'killer' ? 'bg-[#C0392B]' : 'bg-noir-blue'}
+        `}>
+          {(identityRole || playerRole) === 'killer' ? (
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6.92 5H5l9 9 1-.94m4.96 6.06-.84.84a.996.996 0 0 1-1.41 0l-3.12-3.12-2.68 2.66-1.41-1.41 1.42-1.42L3 7.75V3h4.75l8.92 8.92 1.42-1.42 1.41 1.41-2.67 2.67 3.12 3.12c.4.4.4 1.03.01 1.42z"/>
+            </svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          )}
+        </div>
+      )}
+
+      {/* Disguise badge — mor kılıç, Standart mod */}
+      {isDisguise && (
+        <div className="
+          absolute -top-2 -right-2 rounded-full p-1 shadow-lg border-[1.5px] border-[#0A0C0E] z-[60]
+          flex items-center justify-center pointer-events-none
+          bg-[#7B3FBE]
+        " style={{ boxShadow: '0 0 8px rgba(123,63,190,0.7)' }}>
+          <svg className="w-3.5 h-3.5" fill="rgba(255,255,255,0.85)" viewBox="0 0 24 24">
+            <path d="M6.92 5H5l9 9 1-.94m4.96 6.06-.84.84a.996.996 0 0 1-1.41 0l-3.12-3.12-2.68 2.66-1.41-1.41 1.42-1.42L3 7.75V3h4.75l8.92 8.92 1.42-1.42 1.41 1.41-2.67 2.67 3.12 3.12c.4.4.4 1.03.01 1.42z"/>
+          </svg>
+        </div>
+      )}
+
       {/* Kılıç badge — sağ üst (katil komşuydu, dedektif görür) */}
       {canvasAdjacent && canvasTypes.includes('killer') && (
         <div
@@ -286,6 +290,20 @@ export default function SuspectCard({
             />
           </motion.div>
         </div>
+      )}
+
+      {/* Oyun Sonu Çerçeveleri (z-50) - Simgelerin (z-[60]) altında kalacak şekilde */}
+      {endgameRole === 'killer' && (
+        <div className="absolute inset-0 rounded-lg border-[3px] border-red-500 pointer-events-none z-50 animate-pulse"
+             style={{ boxShadow: '0 0 10px rgba(239,68,68,0.5), inset 0 0 8px rgba(239,68,68,0.3)' }} />
+      )}
+      {endgameDisguise && (
+        <div className="absolute inset-0 rounded-lg border-[3px] border-purple-500 pointer-events-none z-50 animate-pulse"
+             style={{ boxShadow: '0 0 10px rgba(168,85,247,0.5), inset 0 0 8px rgba(168,85,247,0.3)' }} />
+      )}
+      {endgameRole === 'inspector' && (
+        <div className="absolute inset-0 rounded-lg border-[3px] border-blue-500 pointer-events-none z-50 animate-pulse"
+             style={{ boxShadow: '0 0 10px rgba(59,130,246,0.5), inset 0 0 8px rgba(59,130,246,0.3)' }} />
       )}
     </div>
   );

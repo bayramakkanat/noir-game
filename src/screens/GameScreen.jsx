@@ -353,18 +353,19 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
     ['kill', 'arrest', 'solve_identity', 'solve_disguise'].includes(pendingAction) &&
     actions.isCoordTargetable(game, r, c, pendingAction, secrets);
 
-  const isMyIdentity =
-    humanRole === 'killer'
-      ? cell.suspectId === secrets.killerIdentityId
-      : cell.suspectId === secrets.inspectorSecretId;
+  const isMyIdentity = game.gameOver
+    ? (cell.suspectId === game.killer?.identitySuspectId || cell.suspectId === game.inspector?.secretIdentitySuspectId)
+    : (humanRole === 'killer'
+        ? cell.suspectId === secrets.killerIdentityId
+        : cell.suspectId === secrets.inspectorSecretId);
 
   const isExonerated = game.publicExonerated.includes(cell.suspectId);
 
-  // Standart mod: sadece katil kendi yedek kılığını görür
+  // Standart mod: sadece katil kendi yedek kılığını görür; oyun bittiğinde herkes görür
   const isDisguise =
     game.gameMode === GAME_MODE.STANDARD &&
-    humanRole === 'killer' &&
-    cell.suspectId === game.killer.disguiseSuspectId;
+    cell.suspectId === game.killer.disguiseSuspectId &&
+    (game.gameOver || humanRole === 'killer');
 
   // Canvas badge: her iki oyuncu da görür
   // killer_answers → kılıç (katil komşuydu)
@@ -393,10 +394,14 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
     return Array.from(types);
   })();
 
+  // ÖNEMLİ: isMyIdentity her zaman isExonerated'dan önce kontrol edilir.
+  // Aksi halde, oyun sonunda dedektifin (veya katilin) kimliği temize çıkarılmış
+  // bir karaktere denk gelirse 'mine' durumuna hiç girilmez ve büyüteç/kılıç
+  // badge'i hiç görünmez (sadece çerçeve rengi görünür).
   let cardState = 'normal';
   if (isDeceased) cardState = 'eliminated';
-  else if (isExonerated) cardState = 'exonerated';
   else if (isMyIdentity) cardState = 'mine';
+  else if (isExonerated) cardState = 'exonerated';
   // Hedeflenebilir/Seçilebilir kartlarda SuspectCard'ın kendi sarı sınırını kapattık,
   // çünkü BoardCell'in dışına animate-pulse ring ekliyoruz. (Çift çerçeveyi önlemek için)
 
@@ -482,7 +487,16 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
         layout: CARD_LAYOUT_TRANSITION,
         scale: { type: 'spring', stiffness: 300, damping: 20 }
       }}
-      style={{ zIndex: isWrapAround ? 50 : (isTargetable || isPickable ? 30 : 1), position: 'relative' }}
+      style={{
+        zIndex: isWrapAround
+          ? 50
+          : (isTargetable || isPickable)
+            ? 30
+            : (isMyIdentity || isDisguise)
+              ? 35
+              : 1,
+        position: 'relative',
+      }}
       whileHover={(!isDeceased && humanCanAct) ? { scale: 1.07, zIndex: 40 } : {}}
       className={`cursor-pointer`}
     >
@@ -495,22 +509,9 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
           style={{ boxShadow: '0 0 12px rgba(239,68,68,0.6)' }} />
       )}
       
-      {/* OYUN SONU: Gizli kimlikleri açıkça göster */}
+      {/* OYUN SONU: Gizli kimlikleri açıkça göster - Moved to inside z-10 container */}
       {game.gameOver && (
         <>
-          {cell.suspectId === game.killer?.identitySuspectId && (
-            <div className="absolute inset-0 rounded-lg border-[3px] border-red-500 pointer-events-none z-30 animate-pulse"
-                 style={{ boxShadow: '0 0 10px rgba(239,68,68,0.5), inset 0 0 8px rgba(239,68,68,0.3)' }} />
-          )}
-          {game.gameMode === GAME_MODE.STANDARD && cell.suspectId === game.killer?.disguiseSuspectId && (
-            <div className="absolute inset-0 rounded-lg border-[3px] border-purple-500 pointer-events-none z-30 animate-pulse"
-                 style={{ boxShadow: '0 0 10px rgba(168,85,247,0.5), inset 0 0 8px rgba(168,85,247,0.3)' }} />
-          )}
-          {cell.suspectId === game.inspector?.secretIdentitySuspectId && (
-            <div className="absolute inset-0 rounded-lg border-[3px] border-blue-500 pointer-events-none z-30 animate-pulse"
-                 style={{ boxShadow: '0 0 10px rgba(59,130,246,0.5), inset 0 0 8px rgba(59,130,246,0.3)' }} />
-          )}
-          
           {/* Dedektifin elinde kalan masum kartlarını göster */}
           {game.inspector?.hand?.includes(cell.suspectId) && (
             <div className="absolute inset-0 rounded-lg border-[2px] border-green-500/70 pointer-events-none z-30"
@@ -541,11 +542,23 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
           size={cellSize}
           onClick={handleClick}
           showName
-          playerRole={humanRole}
+          playerRole={
+            game.gameOver
+              ? (cell.suspectId === game.killer?.identitySuspectId ? 'killer' : 'inspector')
+              : humanRole
+          }
+          isIdentityBadge={isMyIdentity}
+          identityRole={
+            cell.suspectId === (game.gameOver ? game.killer?.identitySuspectId : secrets.killerIdentityId)
+              ? 'killer'
+              : 'inspector'
+          }
           nameFontSize={Math.max(10, Math.round(cellSize * 0.15))}
           canvasAdjacent={isCanvasAdjacent}
           canvasTypes={canvasTypes}
           isDisguise={isDisguise}
+          endgameRole={game.gameOver ? (cell.suspectId === game.killer?.identitySuspectId ? 'killer' : cell.suspectId === game.inspector?.secretIdentitySuspectId ? 'inspector' : null) : null}
+          endgameDisguise={game.gameOver && game.gameMode === GAME_MODE.STANDARD && cell.suspectId === game.killer?.disguiseSuspectId}
         />
       </div>
     </motion.div>
@@ -928,7 +941,7 @@ function ToastNotification({ logs }) {
 
   React.useEffect(() => {
     if (!latestLog) return;
-    const timer = setTimeout(() => setDismissedIndex(latestIndex), 5000);
+    const timer = setTimeout(() => setDismissedIndex(latestIndex), 3000);
     return () => clearTimeout(timer);
   }, [latestLog, latestIndex]);
 

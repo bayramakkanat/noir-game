@@ -68,6 +68,7 @@ export function usePeerMultiplayer() {
   const peerRef = useRef(null);
   const connRef = useRef(null);
   const myRoleRef = useRef(null);
+  const isHostRef = useRef(false);
 
   const isConnected = status === 'playing';
   useWakeLock(isConnected);
@@ -149,7 +150,9 @@ export function usePeerMultiplayer() {
   // Gelen veriyi işle
   const handleIncomingData = useCallback((data) => {
     if (data.type === 'gameState') {
-      const role = myRoleRef.current;
+      const role = data.assignedRole || myRoleRef.current;
+      setMyRole(role);
+      myRoleRef.current = role;
       const payload = data.payload;
 
       // İlk log — katil için normal, dedektif için bekleme mesajı
@@ -197,7 +200,30 @@ export function usePeerMultiplayer() {
         };
       });
     }
-  }, []);
+    else if (data.type === 'restartRequest') {
+      if (isHostRef.current) {
+        // Guest restart istedi ve 'killer' olmak istiyor.
+        const peerNewRole = data.requestedRole || 'inspector';
+        const myNewRole = peerNewRole === 'killer' ? 'inspector' : 'killer';
+        
+        setMyRole(myNewRole);
+        myRoleRef.current = myNewRole;
+
+        setGame(prev => {
+          const newGame = prev.gameMode === 'standard' ? createStandardGame(myNewRole) : createClassicGame(myNewRole);
+          const gameWithRole = { ...newGame, humanRole: myNewRole };
+          if (connRef.current?.open) {
+            connRef.current.send({
+              type: 'gameState',
+              payload: serializeGameState(newGame, peerNewRole),
+              assignedRole: peerNewRole
+            });
+          }
+          return gameWithRole;
+        });
+      }
+    }
+  }, [serializeGameState]);
 
   // Oda oluştur (Katil)
   const createRoom = useCallback(async (roomName, gameMode) => {
@@ -211,6 +237,8 @@ export function usePeerMultiplayer() {
     peer.on('open', () => {
       setRoomId(peer.id);
       setMyRole('killer');
+      myRoleRef.current = 'killer';
+      isHostRef.current = true;
       setStatus('waiting');
     });
 
@@ -224,6 +252,7 @@ export function usePeerMultiplayer() {
         conn.send({
           type: 'gameState',
           payload: serializeGameState(initialGame, 'inspector'),
+          assignedRole: 'inspector'
         });
       });
       conn.on('data', handleIncomingData);
@@ -250,7 +279,12 @@ export function usePeerMultiplayer() {
     peer.on('open', () => {
       const conn = peer.connect(roomName.trim());
       connRef.current = conn;
-      conn.on('open', () => { setRoomId(roomName); setMyRole('inspector'); });
+      conn.on('open', () => { 
+        setRoomId(roomName); 
+        setMyRole('inspector'); 
+        myRoleRef.current = 'inspector';
+        isHostRef.current = false;
+      });
       conn.on('data', handleIncomingData);
       conn.on('close', () => { setStatus('idle'); setError('Bağlantı koptu'); cleanup(); });
     });
@@ -264,7 +298,7 @@ export function usePeerMultiplayer() {
 
   // ─── Oyuncu hareketleri ───────────────────────────────────────────────────
 
-  const executeBoardAction = useCallback((r, c) => {
+  const executeBoardAction = useCallback((r, c, quickActionType = null) => {
     setGame((prev) => {
       if (!prev || !isMyTurn(prev) || prev.gameOver) return prev;
       const secrets = getActingSecrets(prev);
@@ -273,13 +307,14 @@ export function usePeerMultiplayer() {
 
       let result, actionType;
       const isStandard = prev.gameMode === 'standard';
+      const actionToExecute = quickActionType || prev.pendingAction;
 
-      if (prev.pendingAction === 'kill') {
+      if (actionToExecute === 'kill') {
         const fn = isStandard ? applyStandardKill : applyKill;
         result = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         actionType = 'kill';
         if (result.ok) playKillSound();
-      } else if (prev.pendingAction === 'arrest') {
+      } else if (actionToExecute === 'arrest') {
         const fn = isStandard ? applyStandardAccuse : applyArrest;
         result = fn(prev, suspectId, secrets.killerIdentityId, secrets.inspectorSecretId);
         actionType = 'arrest';
@@ -287,9 +322,9 @@ export function usePeerMultiplayer() {
           if (result.game.gameOver && result.game.winner === 'inspector') playArrestSuccessSound();
           else playArrestFailSound();
         }
-      } else if (prev.pendingAction === 'solve_identity') {
+      } else if (actionToExecute === 'solve_identity') {
         return { ...prev, pendingAction: 'solve_disguise', solveGuess: { identityId: suspectId } };
-      } else if (prev.pendingAction === 'solve_disguise') {
+      } else if (actionToExecute === 'solve_disguise') {
         if (suspectId === prev.solveGuess?.identityId) return prev;
         result = applyStandardSolve(prev, prev.solveGuess.identityId, suspectId);
         actionType = 'solve';
@@ -395,6 +430,33 @@ export function usePeerMultiplayer() {
     setRoomId(null); setMyRole(null); setGame(null); setStatus('idle'); setError(null);
   }, [cleanup]);
 
+  const restartGame = useCallback(() => {
+    if (connRef.current?.open) {
+      if (isHostRef.current) {
+        // Host benim. Ben bastım, demek ki ben 'killer' olacağım.
+        const myNewRole = 'killer';
+        const peerNewRole = 'inspector';
+        
+        setMyRole(myNewRole);
+        myRoleRef.current = myNewRole;
+
+        setGame(prev => {
+          const newGame = prev.gameMode === 'standard' ? createStandardGame(myNewRole) : createClassicGame(myNewRole);
+          const gameWithRole = { ...newGame, humanRole: myNewRole };
+          connRef.current.send({
+            type: 'gameState',
+            payload: serializeGameState(newGame, peerNewRole),
+            assignedRole: peerNewRole
+          });
+          return gameWithRole;
+        });
+      } else {
+        // Guest benim. Ben bastım, demek ki ben 'killer' olacağım.
+        connRef.current.send({ type: 'restartRequest', requestedRole: 'killer' });
+      }
+    }
+  }, [serializeGameState]);
+
   const getActingSecretsWrapper = useCallback((gameState) => getActingSecrets(gameState), []);
   const isCoordTargetableWrapper = useCallback((gameState, r, c, action, secrets) =>
     isCoordTargetable(gameState, r, c, action, secrets), []);
@@ -412,5 +474,6 @@ export function usePeerMultiplayer() {
     getActingSecrets: getActingSecretsWrapper,
     isCoordTargetable: isCoordTargetableWrapper,
     runAiTurn: () => {},
+    restartGame,
   };
 }

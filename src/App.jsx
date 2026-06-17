@@ -202,7 +202,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
           className="mt-6 font-mono text-[9px] text-white/15 tracking-widest uppercase anim-fade-in"
           style={{ animationDelay: '0.35s' }}
         >
-          Vercel · React
+          Vercel · React · PeerJS
         </p>
       </div>
     </div>
@@ -302,7 +302,7 @@ export default function App() {
             isCoordTargetable: multi.isCoordTargetable,
           }}
           onQuit={() => { multi.leaveRoom(); setMode('menu'); }}
-          onReset={() => { multi.leaveRoom(); setMode('menu'); }}
+          onReset={multi.restartGame}
           isMultiplayer={true}
           myRole={multi.myRole}
           roomId={multi.roomId}
