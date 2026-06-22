@@ -508,15 +508,32 @@ export function runStandardAiTurn(game) {
     const publicExonerated = game.publicExonerated ?? [];
     const stealthyNeighborsCount = getAliveNeighborsOfSuspect(game.board, top.suspectId)
       .filter(n => !publicExonerated.includes(n.cell.suspectId)).length;
-    const isStealthyEnough = stealthyNeighborsCount >= 4 || isVeryNarrowed;
+
+    const inspectorPos = positionOf(game.board, secretId);
+    let isInMortalDanger = false;
+    if (inspectorPos && killerCandidates.size > 0 && killerCandidates.size <= 4) {
+      for (const candId of killerCandidates) {
+        const cpos = positionOf(game.board, candId);
+        if (cpos && chebyshev(inspectorPos.r, inspectorPos.c, cpos.r, cpos.c) <= 1) {
+          isInMortalDanger = true;
+          break;
+        }
+      }
+    }
+
+    const isStealthyEnough = stealthyNeighborsCount >= 4 || isVeryNarrowed || isInMortalDanger;
 
     const isStrongCandidate = top.isCandidate && isVeryNarrowed;
     const strongPattern = top.crimeAdj > 0 && top.score >= cfg.patternWeight * 0.9 + cfg.adjacencyWeight * 1.5;
 
-    const strongSignal = (isStrongCandidate || strongPattern) && isStealthyEnough;
+    const strongSignal = (isStrongCandidate || strongPattern || (isInMortalDanger && top.isCandidate)) && isStealthyEnough;
 
     let currentArrestP = cfg.highScoreArrestP;
-    if (killerCandidates.size > 4) {
+    if (isVeryNarrowed) {
+      currentArrestP = 1.0;
+    } else if (isInMortalDanger) {
+      currentArrestP = 0.85;
+    } else if (killerCandidates.size > 4) {
       currentArrestP = cfg.highScoreArrestP * 0.25;
     } else if (isNarrowedDown) {
       currentArrestP = cfg.highScoreArrestP * 0.45;
