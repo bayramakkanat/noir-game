@@ -517,7 +517,7 @@ export function runStandardAiTurn(game) {
 
     let currentArrestP = cfg.highScoreArrestP;
     if (killerCandidates.size > 4) {
-      currentArrestP = isVeryNarrowed ? 0.25 : 0.0;
+      currentArrestP = cfg.highScoreArrestP * 0.25;
     } else if (isNarrowedDown) {
       currentArrestP = cfg.highScoreArrestP * 0.45;
     }

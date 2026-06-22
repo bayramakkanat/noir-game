@@ -205,7 +205,7 @@ function StandardRules() {
           <p className="font-mono text-[10px] tracking-widest uppercase text-amber-400/70 mb-2">
             Senaryo 1 — Katil öldürünce
           </p>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
             <div className="flex flex-col items-center gap-1 shrink-0 w-14">
               <div className="w-10 h-12 rounded-lg border-2 border-red-400/60 bg-[#1A0A0A] flex items-center justify-center relative shadow-lg mx-auto">
                 <img src={dedektifImg} alt="Dedektif" className="w-7 h-7 object-contain" style={{ filter: 'invert(1)' }} />
@@ -213,7 +213,7 @@ function StandardRules() {
               </div>
               <span className="font-mono text-[8px] text-red-400/70 tracking-wide">Öldürüldü</span>
             </div>
-            <span className="text-[#4A4A5E] text-lg shrink-0">→</span>
+            <span className="text-[#4A4A5E] text-lg shrink-0 rotate-90 sm:rotate-0">→</span>
             <div className="flex-1 rounded-lg bg-blue-500/10 border border-blue-400/25 px-2.5 py-1.5">
               <p className="font-mono text-[9px] text-blue-300/80 leading-snug">
                 Karakterin üzerinde <img src={dedektifImg} alt="Dedektif" className="inline w-4 h-4 object-contain align-middle mx-0.5" style={{ filter: 'invert(1)' }} /> belirir → dedektifin gizli kimliği o karaktere <strong className="text-blue-300">komşu</strong> demektir.
@@ -230,7 +230,7 @@ function StandardRules() {
           <p className="font-mono text-[10px] tracking-widest uppercase text-green-400/70 mb-2">
             Senaryo 2 — Dedektif temize çıkarınca
           </p>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
             <div className="flex flex-col items-center gap-1 shrink-0 w-14">
               <div className="w-10 h-12 rounded-lg border-2 border-green-400/60 bg-[#0A1A0A] flex items-center justify-center relative shadow-lg mx-auto">
                 <span className="text-xl">🗡️</span>
@@ -238,7 +238,7 @@ function StandardRules() {
               </div>
               <span className="font-mono text-[8px] text-green-400/70 tracking-wide">Temize çıkarıldı</span>
             </div>
-            <span className="text-[#4A4A5E] text-lg shrink-0">→</span>
+            <span className="text-[#4A4A5E] text-lg shrink-0 rotate-90 sm:rotate-0">→</span>
             <div className="flex-1 rounded-lg bg-red-500/10 border border-red-400/25 px-2.5 py-1.5">
               <p className="font-mono text-[9px] text-red-300/80 leading-snug">
                 Karakterin üzerinde <span className="text-white/70">🗡️</span> belirir → katil o karaktere <strong className="text-red-300">komşu</strong> demektir.

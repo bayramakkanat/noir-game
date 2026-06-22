@@ -97,7 +97,7 @@ function MainMenu({ onSelect, isMuted, onToggleMute, globalGameMode, setGlobalGa
       }}
     >
       <AmbientBackground variant="menu" density="full" className="z-[1]" />
-      <div className="absolute inset-0 bg-black/40 z-[2]" />
+      <div className="absolute inset-0 bg-black/15 z-[2]" />
       <div className="absolute bottom-0 left-0 right-0 h-72 bg-gradient-to-t from-[#07070F] to-transparent z-[2] pointer-events-none" />
       <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-[#07070F]/60 to-transparent z-[2] pointer-events-none" />
 
