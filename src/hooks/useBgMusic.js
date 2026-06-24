@@ -17,6 +17,7 @@ export function useBgMusic(play) {
     }
 
     const audio = audioRef.current;
+    let isActive = true; // Hook'un hala 'play' modunda geçerli olup olmadığını takip eder
 
     if (fadeRef.current) {
       clearInterval(fadeRef.current);
@@ -29,10 +30,15 @@ export function useBgMusic(play) {
 
     if (play) {
       const startFadeIn = () => {
+        if (!isActive) return;
         const target = 0.5;
         const step   = target / 30;
         if (fadeRef.current) clearInterval(fadeRef.current);
         fadeRef.current = setInterval(() => {
+          if (!isActive) {
+             clearInterval(fadeRef.current);
+             return;
+          }
           if (audio.volume + step >= target) {
             audio.volume = target;
             clearInterval(fadeRef.current);
@@ -44,19 +50,19 @@ export function useBgMusic(play) {
       };
 
       audio.play().then(() => {
-        startFadeIn();
+        if (isActive) startFadeIn();
       }).catch(() => {
         // Mobil dahil tüm etkileşim eventlerini dinle (capture phase)
         resumeRef = () => {
+          if (!isActive) return;
           audio.play().then(() => {
-            startFadeIn();
+            if (isActive) startFadeIn();
             if (eventsAdded) {
               EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
               eventsAdded = false;
             }
           }).catch(() => {
             // Eğer Safari touchstart'ı geçerli saymazsa başarısız olur.
-            // Bu durumda dinleyiciler kalmaya devam eder, bir sonraki touchend veya click ile tekrar dener.
           });
         };
 
@@ -77,10 +83,14 @@ export function useBgMusic(play) {
             audio.volume -= step;
           }
         }, 50);
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
       }
     }
 
     return () => {
+      isActive = false;
       if (fadeRef.current) {
         clearInterval(fadeRef.current);
         fadeRef.current = null;
