@@ -50,13 +50,21 @@ export function useBgMusic(play) {
       };
 
       audio.play().then(() => {
-        if (isActive) startFadeIn();
+        if (!isActive) {
+          audio.pause();
+          return;
+        }
+        startFadeIn();
       }).catch(() => {
         // Mobil dahil tüm etkileşim eventlerini dinle (capture phase)
         resumeRef = () => {
           if (!isActive) return;
           audio.play().then(() => {
-            if (isActive) startFadeIn();
+            if (!isActive) {
+              audio.pause();
+              return;
+            }
+            startFadeIn();
             if (eventsAdded) {
               EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
               eventsAdded = false;
