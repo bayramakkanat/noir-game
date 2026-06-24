@@ -240,7 +240,14 @@ function useGridAndPanelSize(numRows, numCols) {
       const isDesktop = vw >= 1024;
 
       if (!isDesktop) {
-        setSizes({ cellSize: Math.max(56, Math.floor((vw - 8) / numCols)), panelWidth: vw, cardSize: 64 });
+        // Mobile uses the top ~54% of the screen (bottom 46vh is for ActionPanel)
+        const gridAvailH = (vh * 0.54) - 32; // Leave a 32px safe margin for arrows
+        const cellFromW = Math.floor((vw - 8) / numCols);
+        const gapH = Math.max(3, Math.round((gridAvailH / numRows) * 0.055));
+        const cellFromH = Math.floor((gridAvailH - (numRows - 1) * gapH) / numRows);
+        
+        const cellSize = Math.max(44, Math.min(cellFromW, cellFromH));
+        setSizes({ cellSize, panelWidth: vw, cardSize: 64 });
         return;
       }
 
