@@ -729,11 +729,11 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
               return (
                 <React.Fragment key={`row-arrows-${r}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}} 
-                    style={{ position: 'absolute', left: 4, top: ri * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', left: 4, top: ri * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
                     <ArrowBtn dir="left" onClick={() => handleRowArrow(r, 'left')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', right: 4, top: ri * (CELL + GAP) + CELL / 2, transform: 'translateY(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', right: 4, top: ri * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
                     <ArrowBtn dir="right" onClick={() => handleRowArrow(r, 'right')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
@@ -747,11 +747,11 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
               return (
                 <React.Fragment key={`col-arrows-${c}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', top: 4, left: ci * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', top: 4, left: ci * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
                     <ArrowBtn dir="up" onClick={() => handleColArrow(c, 'up')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', bottom: 4, left: ci * (CELL + GAP) + CELL / 2, transform: 'translateX(-50%)', zIndex: 100 }}>
+                    style={{ position: 'absolute', bottom: 4, left: ci * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
                     <ArrowBtn dir="down" onClick={() => handleColArrow(c, 'down')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
