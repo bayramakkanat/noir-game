@@ -659,6 +659,22 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
   const CELL = cellSize;
   const GAP  = Math.max(3, Math.round(cellSize * 0.055));
 
+  const getRowOffset = (ri) => {
+    if (activeRows.length <= 1) return 0;
+    const mid = (activeRows.length - 1) / 2;
+    const factor = (ri - mid) / mid;
+    const maxOffset = Math.min(24, CELL * 0.35);
+    return -factor * maxOffset;
+  };
+
+  const getColOffset = (ci) => {
+    if (activeCols.length <= 1) return 0;
+    const mid = (activeCols.length - 1) / 2;
+    const factor = (ci - mid) / mid;
+    const maxOffset = Math.min(24, CELL * 0.35);
+    return -factor * maxOffset;
+  };
+
   return (
     <LayoutGroup>
       <div className="flex flex-col items-center">
@@ -729,11 +745,11 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
               return (
                 <React.Fragment key={`row-arrows-${r}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}} 
-                    style={{ position: 'absolute', left: 4, top: ri * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
+                    style={{ position: 'absolute', left: 4, top: ri * (CELL + GAP) + CELL / 2 - 18 + getRowOffset(ri), zIndex: 100 }}>
                     <ArrowBtn dir="left" onClick={() => handleRowArrow(r, 'left')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', right: 4, top: ri * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
+                    style={{ position: 'absolute', right: 4, top: ri * (CELL + GAP) + CELL / 2 - 18 + getRowOffset(ri), zIndex: 100 }}>
                     <ArrowBtn dir="right" onClick={() => handleRowArrow(r, 'right')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
@@ -747,11 +763,11 @@ function BoardWithArrows({ game, actions, cellSize, activeRows, activeCols }) {
               return (
                 <React.Fragment key={`col-arrows-${c}`}>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', top: 4, left: ci * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
+                    style={{ position: 'absolute', top: 4, left: ci * (CELL + GAP) + CELL / 2 - 18 + getColOffset(ci), zIndex: 100 }}>
                     <ArrowBtn dir="up" onClick={() => handleColArrow(c, 'up')} highlighted={hl} />
                   </motion.div>
                   <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}
-                    style={{ position: 'absolute', bottom: 4, left: ci * (CELL + GAP) + CELL / 2 - 18, zIndex: 100 }}>
+                    style={{ position: 'absolute', bottom: 4, left: ci * (CELL + GAP) + CELL / 2 - 18 + getColOffset(ci), zIndex: 100 }}>
                     <ArrowBtn dir="down" onClick={() => handleColArrow(c, 'down')} highlighted={hl} />
                   </motion.div>
                 </React.Fragment>
