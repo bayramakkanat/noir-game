@@ -308,9 +308,14 @@ export function runStandardAiTurn(game) {
         if (d < minInspectorDist) minInspectorDist = d;
       }
     }
-    const inspectorThreat = minInspectorDist <= 1;
-    const inspectorClose  = minInspectorDist <= 2;
-    const tightPool       = inspectorCandidates.size <= 3;
+    const tightPool       = inspectorCandidates.size <= 4;
+    // Eğer dedektif havuzu çok genişse (örn. 25 kişi), yanımızdaki kişinin dedektif olma ihtimali çok düşüktür.
+    // Bu yüzden sadece havuz daraldığında (<=4) paniğe kapılıp "tehdit (threat)" algılamalıyız.
+    const inspectorThreat = minInspectorDist <= 1 && tightPool;
+    const inspectorClose  = minInspectorDist <= 2 && inspectorCandidates.size <= 8;
+
+    // Dedektif bizim kimliğimizi matematiksel olarak (hançer uzaklıkları ile) çözdü mü?
+    const exposedThreat = game.killerCandidates && game.killerCandidates.length <= 3;
 
     const targets = getKillTargets(game, killerIdentityId).map(t => {
       let score = 0;
@@ -345,6 +350,15 @@ export function runStandardAiTurn(game) {
          score += inspectorAdjCount * 10;
       }
 
+      if (t.suspectId === disguiseSuspectId) {
+        if (inspectorCandidates.size > 4 && killCountNow < 7) {
+          score -= 500; // Erken aşamada kılığını öldürmek intihardır, yapma!
+        } else {
+          // Oyun sonuna doğru veya dedektif yaklaştığında, kılığını öldürüp kafa karıştırmak (blöf) mantıklı olabilir.
+          score -= 30; 
+        }
+      }
+
       score += Math.random() * 15;
       return { ...t, score };
     }).sort((a, b) => b.score - a.score);
@@ -362,8 +376,14 @@ export function runStandardAiTurn(game) {
       if (currentDeadCount >= 2 && disguiseDeadCount < 1) disguiseScore += 50;
 
       if (inspectorThreat) disguiseScore += 40;
+      if (exposedThreat) disguiseScore += 100; // DEŞİFRE OLDUM! KESİNLİKLE KAÇMAM LAZIM!
       if (clusterScore >= 2) disguiseScore += 25;
       if (killCountNow > 0 && killCountNow % 4 === 0) disguiseScore += 30;
+      
+      // Eğer köşedeysek (etrafımızda az hedef varsa) kılık değiştirmek daha caziptir
+      if (targets.length <= 4) {
+        disguiseScore += (5 - targets.length) * 10;
+      }
     }
     disguiseScore += Math.random() * 20;
     const shouldDisguise = !isDisguiseDead && disguiseScore >= 60;
@@ -372,6 +392,13 @@ export function runStandardAiTurn(game) {
     const shifts = allShiftMoves(game);
     let bestKillerShift = null;
     let bestKillerShiftScore = -Infinity;
+    
+    // Rastgele kafa karıştırıcı (blöf) kaydırma ihtimali (%25)
+    let bluffSuspectId = null;
+    if (Math.random() < 0.25) {
+       bluffSuspectId = pickRandom(allAliveIds);
+    }
+    
     for (const s of shifts) {
       const tempBoard = s.axis === 'row'
         ? shiftRow(game.board, s.index, s.direction)
@@ -397,7 +424,32 @@ export function runStandardAiTurn(game) {
       ).length;
       const clusterGain = clusterScore - newCluster;
 
-      const shiftScore = distGain * 20 + clusterGain * 12 + (Math.random() - 0.5) * 10;
+      let shiftScore = distGain * 20 + clusterGain * 12 + (Math.random() - 0.5) * 10;
+      
+      // Kılık değiştirme planımız varsa, yedek kılığı merkeze çekmek harika bir hamledir
+      if (shouldDisguise && !isDisguiseDead && disguisePos) {
+        const newDisguisePos = positionOf(tempBoard, disguiseSuspectId);
+        if (newDisguisePos) {
+          const oldCenterDist = Math.abs(disguisePos.r - 2) + Math.abs(disguisePos.c - 2);
+          const newCenterDist = Math.abs(newDisguisePos.r - 2) + Math.abs(newDisguisePos.c - 2);
+          shiftScore += (oldCenterDist - newCenterDist) * 15;
+        }
+      } else if (bluffSuspectId) {
+        // Blöf yapıyorsak, tamamen alakasız bir karakteri merkeze çekip dedektifi kandıralım!
+        const oldBluffPos = positionOf(game.board, bluffSuspectId);
+        const newBluffPos = positionOf(tempBoard, bluffSuspectId);
+        if (oldBluffPos && newBluffPos) {
+          const oldCenterDist = Math.abs(oldBluffPos.r - 2) + Math.abs(oldBluffPos.c - 2);
+          const newCenterDist = Math.abs(newBluffPos.r - 2) + Math.abs(newBluffPos.c - 2);
+          shiftScore += (oldCenterDist - newCenterDist) * 12; // Kendi kimliğimiz gibi puanla
+        }
+      } else if (targets.length <= 4 && killerPos) {
+        // Şu anki kimliğimiz köşedeyse (hedefimiz azsa) ve blöf yapmıyorsak, merkeze doğru kaymak iyidir
+        const oldCenterDist = Math.abs(killerPos.r - 2) + Math.abs(killerPos.c - 2);
+        const newCenterDist = Math.abs(newKillerPos.r - 2) + Math.abs(newKillerPos.c - 2);
+        shiftScore += (oldCenterDist - newCenterDist) * 10;
+      }
+
       if (shiftScore > bestKillerShiftScore) {
         bestKillerShiftScore = shiftScore;
         bestKillerShift = s;
@@ -407,16 +459,19 @@ export function runStandardAiTurn(game) {
 
     // KARAR AĞACI
 
-    // 1. Dedektif adayını öldürebiliyorsak vur
     const canKillInspector = targets.some(t => inspectorCandidates.has(t.suspectId));
-    if (canKillInspector && (tightPool || Math.random() < 0.8)) {
+    const isHard = game.difficulty === 'hard';
+    const killGambleChance = isHard ? 1.0 / inspectorCandidates.size : 0.8;
+    const shouldGamble = inspectorCandidates.size <= 2 || Math.random() < killGambleChance;
+
+    if (canKillInspector && shouldGamble) {
       const bestScore = targets[0].score;
       const t = targets.find(t => inspectorCandidates.has(t.suspectId) && t.score >= bestScore - 100) || targets.find(t => inspectorCandidates.has(t.suspectId));
       if (t) return applyStandardKill(game, t.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
     }
 
-    // 2. Tehdit altındaysak: önce kaç (kılık değiştir veya kaydır)
-    if (inspectorThreat) {
+    // 2. Tehdit altındaysak veya Deşifre olduysak: önce kaç (kılık değiştir veya kaydır)
+    if (inspectorThreat || exposedThreat) {
       if (shouldDisguise && Math.random() < 0.75) {
         const { ok, game: next } = applyStandardDisguise(game);
         if (ok) return next;
@@ -426,14 +481,21 @@ export function runStandardAiTurn(game) {
       }
     }
 
-    // 3. Örüntü çok belirginse: kılık değiştir veya kaydır, ama %100 değil (blöf)
+    // 3. Örüntü çok belirginse: kılık değiştir veya kaydır
     if (clusterScore >= 2 || currentDeadCount >= 2) {
-      if (shouldDisguise && Math.random() < 0.60) {
+      const forceEscape = isHard ? 1.0 : 0.60;
+      if (shouldDisguise && Math.random() < forceEscape) {
         const { ok, game: next } = applyStandardDisguise(game);
         if (ok) return next;
       }
-      if (shiftWorthIt && Math.random() < 0.35) {
+      const forceShift = isHard ? 1.0 : 0.35;
+      if (shiftWorthIt && Math.random() < forceShift) {
         return applyStandardShift(game, bestKillerShift.axis, bestKillerShift.index, bestKillerShift.direction).game;
+      }
+      if (isHard && shifts.length > 0) {
+        // Zor modda hala kaçamadıysa rastgele kaydırarak kaç
+        const s = pickRandom(shifts);
+        return applyStandardShift(game, s.axis, s.index, s.direction).game;
       }
     }
 

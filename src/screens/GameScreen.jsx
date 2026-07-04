@@ -964,7 +964,7 @@ function ToastNotification({ logs }) {
 
   React.useEffect(() => {
     if (!latestLog) return;
-    const timer = setTimeout(() => setDismissedIndex(latestIndex), 3000);
+    const timer = setTimeout(() => setDismissedIndex(latestIndex), 1500);
     return () => clearTimeout(timer);
   }, [latestLog, latestIndex]);
 
