@@ -153,16 +153,28 @@ function scoreShiftMove(game, move, killSites, cfg) {
   return { score, distGain: before.avgKillDist - after.avgKillDist, arrestGain: after.crimeArrestCount - before.crimeArrestCount, huntingBonus };
 }
 
+function isSameShiftAsLast(game, move) {
+  const last = game.lastShift;
+  return !!last && last.axis === move.axis && last.index === move.index && last.direction === move.direction;
+}
+
 function getSmartShift(game, cfg) {
   const moves = allShiftMoves(game);
   if (!moves.length) return null;
   const killSites = getKillSites(game);
-  let bestMove = null, bestScore = Infinity;
-  for (const m of moves) {
-    const { score } = scoreShiftMove(game, m, killSites, cfg);
-    if (score < bestScore) { bestScore = score; bestMove = m; }
+  const scored = moves
+    .map((m) => ({ move: m, ...scoreShiftMove(game, m, killSites, cfg) }))
+    .sort((a, b) => a.score - b.score);
+
+  // Aynı hamleyi tekrar tekrar seçmekten kaçın — döngüsel kaydırmayı önler.
+  const best = scored[0];
+  if (best && isSameShiftAsLast(game, best.move)) {
+    const tolerance = Math.abs(best.score) * 0.15 + 0.5;
+    const alt = scored.find((s) => !isSameShiftAsLast(game, s.move) && s.score <= best.score + tolerance);
+    if (alt) return alt.move;
   }
-  return bestMove || pickRandom(moves);
+
+  return best?.move || pickRandom(moves);
 }
 
 // ─── Solve kararı ─────────────────────────────────────────────────────────────

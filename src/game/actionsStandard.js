@@ -181,7 +181,11 @@ export function applyStandardDisguise(game) {
     disguiseSuspectId: identitySuspectId,
   };
 
-  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, aiFailedArrests: {}, killerCandidates: game.disguiseCandidates ?? null, disguiseCandidates: game.killerCandidates ?? null };
+  // NOT: aiFailedArrests kasıtlı olarak SIFIRLANMAZ — dedektifin "bu karakteri
+  // zaten yanlış tutukladım" hafızası kılık değiştirmeden bağımsız olarak korunmalı.
+  // Aksi halde katil disguise yaptıkça aynı karakter tekrar tekrar (kalıcı dışlama
+  // eşiğine hiç ulaşmadan) yanlış tutuklanabiliyordu.
+  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, killerCandidates: game.disguiseCandidates ?? null, disguiseCandidates: game.killerCandidates ?? null };
 
   if (game.humanRole === 'killer') {
     next = addLog(next, `⇄ Kılık değiştirdin. Yeni kimliğin: <b>${suspectName(disguiseSuspectId)}</b>.`);

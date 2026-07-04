@@ -197,23 +197,32 @@ function scoreArrestTarget(target, killSites, cfg) {
 
 // ─── Akıllı Dedektif Kaydırması ───────────────────────────────────────────────
 // Cinayet mahallerine yaklaşır ve sonraki turda cinayet-komşusu tutuklama açar.
+function isSameShiftAsLast(game, move) {
+  const last = game.lastShift;
+  return !!last && last.axis === move.axis && last.index === move.index && last.direction === move.direction;
+}
+
 function getSmartInspectorShift(game, cfg) {
   const moves = allShiftMoves(game);
   if (!moves.length) return null;
 
   const killSites = getKillSites(game);
-  let bestMove = null;
-  let bestScore = Infinity;
+  const scored = moves
+    .map((m) => ({ move: m, ...scoreInspectorShiftMove(game, m, killSites, cfg) }))
+    .sort((a, b) => a.score - b.score);
 
-  for (const m of moves) {
-    const { score } = scoreInspectorShiftMove(game, m, killSites, cfg);
-    if (score < bestScore) {
-      bestScore = score;
-      bestMove = m;
-    }
+  // Aynı hamleyi tekrar tekrar seçmekten kaçın — katil kaydırmadığında tahta
+  // hep aynı 'en iyi' hamleyi verip döngüsel kaydırmaya (tahtayı boşuna
+  // eski haline döndürmeye) sebep olabiliyordu. Yakın skorlu bir alternatif
+  // varsa onu tercih et; yoksa yine de en iyisini oyna.
+  const best = scored[0];
+  if (best && isSameShiftAsLast(game, best.move)) {
+    const tolerance = Math.abs(best.score) * 0.15 + 0.5;
+    const alt = scored.find((s) => !isSameShiftAsLast(game, s.move) && s.score <= best.score + tolerance);
+    if (alt) return alt.move;
   }
 
-  return bestMove || pickRandom(moves);
+  return best?.move || pickRandom(moves);
 }
 
 // ─── Ana AI turu ──────────────────────────────────────────────────────────────
@@ -342,7 +351,10 @@ export function runAiTurn(game) {
     if (result.ok) return result.game;
   }
 
-  // C) Temize çıkarma — her karar için bağımsız zar at
+  // C) Temize çıkarma — hangi kartı atacağını akıllı seç (artık rastgele değil)
+  // En düşük şüphe skoruna sahip eldeki kartı temize çıkar: böylece yüksek
+  // skorlu (şüpheli) kartlar gelecekteki tutuklama denemeleri için elde kalır,
+  // ve temize çıkarma hamlesi konum bilgisini boşa harcamamış olur.
   const exonerateChance =
     scoredTargets.length > 0 && scoredTargets[0].crimeAdj > 0
       ? cfg.exonerateP * 0.55
@@ -350,7 +362,17 @@ export function runAiTurn(game) {
   if (Math.random() < exonerateChance && game.evidenceDeck.length > 0 && game.inspector.hand.length > 0) {
     const liveInHand = game.inspector.hand.filter(id => !deceasedIds.has(id));
     if (liveInHand.length > 0) {
-      const result = applyExonerate(game, pickRandom(liveInHand));
+      const scoredHand = liveInHand
+        .map((id) => {
+          const pos = positionOf(game.board, id);
+          const score = pos
+            ? scoreArrestTarget({ r: pos.r, c: pos.c, suspectId: id }, killSites, cfg)
+            : -Infinity;
+          return { id, score };
+        })
+        .sort((a, b) => a.score - b.score);
+      const toDiscard = scoredHand[0].id;
+      const result = applyExonerate(game, toDiscard);
       if (result.ok) return result.game;
     }
   }
