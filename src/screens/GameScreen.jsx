@@ -1088,7 +1088,7 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
 }
 
 // ─── Sağ panel ───────────────────────────────────────────────────────────────
-function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, isMultiplayer }) {
+function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, isMultiplayer, isMuted, onToggleMute }) {
   const [showMobileLog, setShowMobileLog] = React.useState(false);
   const {
     phase, turn, humanRole, activeSide,
@@ -1511,6 +1511,8 @@ export default function GameScreen({ game, actions, onQuit, onReset, isMultiplay
             panelWidth={panelWidth}
             cardSize={cardSize}
             isMultiplayer={isMultiplayer}
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
           />
         )}
       </div>
