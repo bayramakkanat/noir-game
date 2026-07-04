@@ -114,11 +114,15 @@ function evaluateInspectorPos(game, board, killSites) {
 
   // Avlanma (Hunting) Skoru: Katilin kimliğini %100 biliyorsak, ona olan mesafemiz
   let distToConfirmedKiller = Infinity;
-  if (game.killerCandidates && game.killerCandidates.size === 1) {
-    const confirmedId = Array.from(game.killerCandidates)[0];
-    const confirmedPos = positionOf(board, confirmedId);
-    if (confirmedPos) {
-      distToConfirmedKiller = chebyshev(pos.r, pos.c, confirmedPos.r, confirmedPos.c);
+  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 2) {
+    for (const candId of game.killerCandidates) {
+      const posCand = positionOf(board, candId);
+      if (posCand) {
+        const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
+        if (d < distToConfirmedKiller) {
+          distToConfirmedKiller = d;
+        }
+      }
     }
   }
 
@@ -183,6 +187,8 @@ function shouldSolve(game, scoredTargets, cfg, deceasedCount, killerCandidates, 
     const top = scoredTargets[0];
     if (top.isCandidate) return true;
   }
+  
+  if (game.difficulty === 'hard' && (killerCandidates?.size > 2)) return false;
 
   if (deceasedCount < 8) return false;
 
@@ -221,7 +227,7 @@ function guessDisguise(game, guessIdentityId, killSites, cfg, disguiseCandidates
     return { id, score: cfg.adjacencyWeight * adj + cfg.patternWeight * pattern + noise };
   });
 
-  scored.sort((a, b) => a.score - b.score);
+  scored.sort((a, b) => b.score - a.score);
   return scored[0]?.id ?? pickRandom(candidates);
 }
 
@@ -253,7 +259,23 @@ export function runStandardAiTurn(game) {
         { ...game, inspector: { ...game.inspector, hand: [fallback] } }, fallback
       ).game;
     }
-    return applyStandardInspectorPickIdentity(game, pickRandom(hand)).game;
+    const isHard = game.difficulty === 'hard';
+    let chosenId = pickRandom(hand);
+    
+    if (isHard) {
+      const killSites = getKillSites(game);
+      const firstKill = killSites[0];
+      if (firstKill) {
+        const scoredHand = hand.map(id => {
+          const pos = positionOf(game.board, id);
+          const dist = pos ? chebyshev(pos.r, pos.c, firstKill.r, firstKill.c) : 0;
+          return { id, dist };
+        }).sort((a, b) => b.dist - a.dist);
+        chosenId = scoredHand[0]?.id || chosenId;
+      }
+    }
+    
+    return applyStandardInspectorPickIdentity(game, chosenId).game;
   }
 
   // ── Katil turu ──
@@ -540,8 +562,12 @@ export function runStandardAiTurn(game) {
 
     const strongSignal = (isStrongCandidate || strongPattern || (isInMortalDanger && top.isCandidate)) && isStealthyEnough;
 
+    const isStrictDeduction = game.difficulty === 'hard';
+
     let currentArrestP = cfg.highScoreArrestP;
-    if (isVeryNarrowed) {
+    if (isStrictDeduction && !isVeryNarrowed) {
+      currentArrestP = 0;
+    } else if (isVeryNarrowed) {
       currentArrestP = 1.0;
     } else if (isInMortalDanger) {
       currentArrestP = 0.85;
@@ -616,7 +642,9 @@ export function runStandardAiTurn(game) {
     }
   }
 
-  if (scoredTargets.length > 0 && arrestStreak === 0 && killerCandidates.size <= 4) {
+  const isStrictDeduction = game.difficulty === 'hard';
+
+  if (!isStrictDeduction && scoredTargets.length > 0 && arrestStreak === 0 && killerCandidates.size <= 4) {
     const top = scoredTargets[0];
     const moderateSignal = deceasedCount === 0 || (top.crimeAdj > 0 && highestScore > cfg.patternWeight * 0.45);
 
@@ -635,7 +663,7 @@ export function runStandardAiTurn(game) {
     return applyStandardShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
   }
 
-  if (scoredTargets.length && arrestStreak === 0 && Math.random() < 0.1) {
+  if (!isStrictDeduction && scoredTargets.length && arrestStreak === 0 && Math.random() < 0.1) {
     return applyStandardAccuse(game, pickRandom(scoredTargets).suspectId, game.killer.identitySuspectId, secretId).game;
   }
 

@@ -1,5 +1,5 @@
 import { CELL_STATUS, PHASE, TURN } from './constants.js';
-import { shiftRow, shiftColumn, positionOf, removeEmptyRowsAndCols } from './board.js';
+import { shiftRow, shiftColumn, positionOf, removeEmptyRowsAndCols, getAliveNeighborsOfSuspect } from './board.js';
 import {
   checkInspectorWinByArrest,
   checkKillerWinByDeaths,
@@ -69,6 +69,15 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
 
   const killSite = killPos ? { r: killPos.r, c: killPos.c, suspectId } : null;
 
+  // Şüpheli kümesi güncelleme: katilin kimliği her zaman öldürülen kişinin
+  // ölüm anındaki canlı komşularından biridir. Önceki küme ile kesiştir.
+  const aliveNeighborIds = getAliveNeighborsOfSuspect(game.board, suspectId).map(n => n.cell.suspectId);
+  const prevCandidates = game.killerCandidates;
+  const intersected = prevCandidates == null
+    ? aliveNeighborIds
+    : prevCandidates.filter(id => aliveNeighborIds.includes(id));
+  const killerCandidates = intersected.length > 0 ? intersected : aliveNeighborIds;
+
   let next = {
     ...game,
     board: boardAfterMark,
@@ -76,6 +85,7 @@ export function applyKill(game, suspectId, killerIdentityId, inspectorSecretId) 
     killCount: (game.killCount ?? 0) + 1,
     killedSuspectIds: [...(game.killedSuspectIds ?? []), suspectId],
     killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
+    killerCandidates,
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
@@ -114,6 +124,9 @@ export function applyArrest(game, targetSuspectId, killerIdentityId, inspectorSe
       ...next.inspector,
       investigated: [...(next.inspector.investigated || []), targetSuspectId],
     },
+    killerCandidates: next.killerCandidates
+      ? next.killerCandidates.filter(id => id !== targetSuspectId)
+      : null,
   };
   next = advanceTurnAfterAction(next);
   return { ok: true, game: next };
@@ -141,6 +154,9 @@ export function applyExonerate(game, discardFromHandId) {
     discardPile: [...game.discardPile, discardFromHandId],
     pendingAction: null,
     pendingExonerateDiscard: null,
+    killerCandidates: game.killerCandidates
+      ? game.killerCandidates.filter(id => id !== discardFromHandId)
+      : null,
   };
 
   if (isDeceased) {

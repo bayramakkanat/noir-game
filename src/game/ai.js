@@ -138,7 +138,20 @@ function evaluateInspectorInvestigation(game, board, killSites) {
       crimeAdjacencyToKillSites(t, killSites) > 0
   ).length;
 
-  return { avgKillDist, crimeArrestCount };
+  let distToConfirmedKiller = Infinity;
+  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 2) {
+    for (const candId of game.killerCandidates) {
+      const posCand = positionOf(board, candId);
+      if (posCand) {
+        const d = chebyshev(inspPos.r, inspPos.c, posCand.r, posCand.c);
+        if (d < distToConfirmedKiller) {
+          distToConfirmedKiller = d;
+        }
+      }
+    }
+  }
+
+  return { avgKillDist, crimeArrestCount, distToConfirmedKiller };
 }
 
 function scoreInspectorShiftMove(game, move, killSites, cfg) {
@@ -153,13 +166,22 @@ function scoreInspectorShiftMove(game, move, killSites, cfg) {
   const distGain = before.avgKillDist - after.avgKillDist;
   const arrestGain = after.crimeArrestCount - before.crimeArrestCount;
 
+  let huntingBonus = 0;
+  if (after.distToConfirmedKiller < before.distToConfirmedKiller) {
+    huntingBonus = -30;
+  }
+  if (after.distToConfirmedKiller <= 1 && before.distToConfirmedKiller > 1) {
+    huntingBonus -= 50;
+  }
+
   const score =
     after.avgKillDist * 2 -
     arrestGain * 5 -
     distGain * 3 +
+    huntingBonus +
     (Math.random() - 0.5) * cfg.noiseLevel * 0.15;
 
-  return { score, distGain, arrestGain, after };
+  return { score, distGain, arrestGain, after, huntingBonus };
 }
 
 // ─── Dedektif tutuklama skoru ─────────────────────────────────────────────────
@@ -252,8 +274,23 @@ export function runAiTurn(game) {
       if (!fallback) return game;
       return applyInspectorPickIdentity({ ...game, inspector: { ...game.inspector, hand: [fallback] } }, fallback).game;
     }
-    const card = pickRandom(hand);
-    return applyInspectorPickIdentity(game, card).game;
+    const isHard = game.difficulty === 'hard';
+    let chosenId = pickRandom(hand);
+    
+    if (isHard) {
+      const killSites = getKillSites(game);
+      const firstKill = killSites[0];
+      if (firstKill) {
+        const scoredHand = hand.map(id => {
+          const pos = positionOf(game.board, id);
+          const dist = pos ? chebyshev(pos.r, pos.c, firstKill.r, firstKill.c) : 0;
+          return { id, dist };
+        }).sort((a, b) => b.dist - a.dist);
+        chosenId = scoredHand[0]?.id || chosenId;
+      }
+    }
+    
+    return applyInspectorPickIdentity(game, chosenId).game;
   }
 
   // ── Katil turu ──
@@ -287,23 +324,49 @@ export function runAiTurn(game) {
   // ── Dedektif turu ──
   const rawArrestTargets = getArrestTargets(game, game.inspector.secretIdentitySuspectId);
   const killedIds = new Set(game.killedSuspectIds ?? []);
+  
+  const knownInnocents = new Set(game.publicExonerated ?? []);
+  const allAliveIds = game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId);
+  const killerCandidates = game.killerCandidates
+    ? new Set(game.killerCandidates.filter(id => !killedIds.has(id) && !knownInnocents.has(id)))
+    : new Set(allAliveIds.filter(id => !knownInnocents.has(id)));
+
   const arrestTargets = rawArrestTargets.filter(t => {
     const investigated = (game.inspector.investigated || []).includes(t.suspectId);
-    return !investigated && !killedIds.has(t.suspectId);
+    return !investigated && !killedIds.has(t.suspectId) && !knownInnocents.has(t.suspectId);
   });
 
   const killSites = getKillSites(game);
   const deceasedCount = game.killCount ?? killSites.length;
-  const deceasedIds = new Set(game.killedSuspectIds ?? []);
   const investigation = evaluateInspectorInvestigation(game, game.board, killSites);
 
+  const isStrictDeduction = game.difficulty === 'hard';
+  const isNarrowed = killerCandidates.size > 0 && killerCandidates.size <= 2;
+
   const scoredTargets = arrestTargets
-    .map(t => ({
-      ...t,
-      crimeAdj: crimeAdjacencyToKillSites(t, killSites),
-      score: scoreArrestTarget(t, killSites, cfg),
-    }))
-    .filter(t => deceasedCount === 0 || t.crimeAdj > 0)
+    .map(t => {
+      let score = scoreArrestTarget(t, killSites, cfg);
+      const isCandidate = killerCandidates.has(t.suspectId);
+      
+      // Strict deduction: Hard mode'da aday değilse score'u yerle bir et, aday ise uçur
+      if (isStrictDeduction) {
+        if (!isCandidate) score -= 1000;
+        else score += 100;
+      } else {
+        if (isCandidate) score += cfg.adjacencyWeight; // Normal modda hafif bonus
+      }
+
+      return {
+        ...t,
+        crimeAdj: crimeAdjacencyToKillSites(t, killSites),
+        isCandidate,
+        score,
+      };
+    })
+    .filter(t => {
+      if (isStrictDeduction && !t.isCandidate && deceasedCount > 0) return false;
+      return deceasedCount === 0 || t.crimeAdj > 0 || t.isCandidate;
+    })
     .sort((a, b) => b.score - a.score);
 
   const highestScore = scoredTargets.length ? scoredTargets[0].score : 0;
@@ -324,76 +387,81 @@ export function runAiTurn(game) {
   };
 
   // ── Dedektif karar matrisi ──────────────────────────────────────────────────
-  // Strateji öncelik sırası:
-  //   A) Çok güçlü ipucu → tutuklama
-  //   B) Elimde ölü kart var → at, el yenile (her zaman yapılmalı)
-  //   C) exonerateP olasılığıyla temize çıkar
-  //   D) Konumlanma için kaydır
-  //   E) Orta güçlü ipucu → tutuklama
-  //   F) Fallback kaydırma / tutuklama
-
-  // A) Çok güçlü sinyal → hemen tutuklama
-  if (scoredTargets.length > 0) {
-    const top = scoredTargets[0];
-    const strongSignal =
-      top.crimeAdj > 0 &&
-      top.score >= cfg.patternWeight * 0.55 + cfg.adjacencyWeight;
-    if (strongSignal && Math.random() < cfg.highScoreArrestP) {
-      const t = pickArrestTarget();
-      if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
-    }
+  // A0) Kesin Tümdengelim: Eğer hard moddaysak ve 2 veya daha az aday varsa, direkt onlardan birini tutukla
+  if (isStrictDeduction && isNarrowed && scoredTargets.length > 0) {
+    const t = pickArrestTarget();
+    if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
   }
 
   // B) Elimde ölü kart varsa → her zaman at, el yenile
-  const deadInHand = game.inspector.hand.filter(id => deceasedIds.has(id));
+  const deadInHand = game.inspector.hand.filter(id => killedIds.has(id));
   if (deadInHand.length > 0 && game.evidenceDeck.length > 0) {
     const result = applyExonerate(game, pickRandom(deadInHand));
     if (result.ok) return result.game;
   }
 
-  // C) Temize çıkarma — hangi kartı atacağını akıllı seç (artık rastgele değil)
-  // En düşük şüphe skoruna sahip eldeki kartı temize çıkar: böylece yüksek
-  // skorlu (şüpheli) kartlar gelecekteki tutuklama denemeleri için elde kalır,
-  // ve temize çıkarma hamlesi konum bilgisini boşa harcamamış olur.
-  const exonerateChance =
-    scoredTargets.length > 0 && scoredTargets[0].crimeAdj > 0
-      ? cfg.exonerateP * 0.55
-      : cfg.exonerateP * 1.2;
+  // C) Temize çıkarma — Hard moddaysak ve henüz çok aday varsa temize çıkarmaya (Exonerate) öncelik ver
+  let exonerateChance = cfg.exonerateP;
+  if (isStrictDeduction && !isNarrowed && deceasedCount > 0) exonerateChance = 0.95; 
+
   if (Math.random() < exonerateChance && game.evidenceDeck.length > 0 && game.inspector.hand.length > 0) {
-    const liveInHand = game.inspector.hand.filter(id => !deceasedIds.has(id));
+    const liveInHand = game.inspector.hand.filter(id => !killedIds.has(id) && !knownInnocents.has(id));
     if (liveInHand.length > 0) {
+      // Hard mode: killerCandidates içinde olan bir kartı elden atıp eleme yapmak çok faydalıdır!
       const scoredHand = liveInHand
         .map((id) => {
-          const pos = positionOf(game.board, id);
-          const score = pos
-            ? scoreArrestTarget({ r: pos.r, c: pos.c, suspectId: id }, killSites, cfg)
-            : -Infinity;
+          const isCand = killerCandidates.has(id);
+          let score = isCand ? -100 : 0; // Aday ise temize çıkarmak harika bir bilgi!
+          
+          if (!isStrictDeduction) {
+            const pos = positionOf(game.board, id);
+            score = pos
+              ? scoreArrestTarget({ r: pos.r, c: pos.c, suspectId: id }, killSites, cfg)
+              : -Infinity;
+          }
           return { id, score };
         })
         .sort((a, b) => a.score - b.score);
+      
       const toDiscard = scoredHand[0].id;
       const result = applyExonerate(game, toDiscard);
       if (result.ok) return result.game;
     }
   }
 
+  // A) Çok güçlü sinyal → hemen tutuklama (Hard modda eğer daralmadıysa ASLA tutuklama yapmaz)
+  if (!isStrictDeduction || isNarrowed) {
+    if (scoredTargets.length > 0) {
+      const top = scoredTargets[0];
+      const strongSignal =
+        top.crimeAdj > 0 &&
+        top.score >= cfg.patternWeight * 0.55 + cfg.adjacencyWeight;
+      if (strongSignal && Math.random() < cfg.highScoreArrestP) {
+        const t = pickArrestTarget();
+        if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
+      }
+    }
+  }
+
   // D) Konumlanma için kaydır
-  if (shiftMove && (needsReposition || shiftHelps)) {
-    const shiftChance = needsReposition ? 0.75 : 0.45;
+  if (shiftMove && (needsReposition || shiftHelps || (isStrictDeduction && !isNarrowed))) {
+    const shiftChance = (needsReposition || (isStrictDeduction && !isNarrowed)) ? 0.90 : 0.45;
     if (Math.random() < shiftChance) {
       return applyShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
     }
   }
 
-  // E) Orta düzey tutuklama
-  if (scoredTargets.length > 0) {
-    const top = scoredTargets[0];
-    const moderateSignal =
-      deceasedCount === 0 ||
-      (top.crimeAdj > 0 && highestScore > cfg.patternWeight * 0.45);
-    if (moderateSignal && Math.random() < cfg.highScoreArrestP * 0.65) {
-      const t = pickArrestTarget();
-      if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
+  // E) Orta düzey tutuklama (Strict deduction kapalıysa)
+  if (!isStrictDeduction || isNarrowed) {
+    if (scoredTargets.length > 0) {
+      const top = scoredTargets[0];
+      const moderateSignal =
+        deceasedCount === 0 ||
+        (top.crimeAdj > 0 && highestScore > cfg.patternWeight * 0.45);
+      if (moderateSignal && Math.random() < cfg.highScoreArrestP * 0.65) {
+        const t = pickArrestTarget();
+        if (t) return applyArrest(game, t.suspectId, game.killer.identitySuspectId, game.inspector.secretIdentitySuspectId).game;
+      }
     }
   }
 
@@ -402,8 +470,8 @@ export function runAiTurn(game) {
     return applyShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
   }
 
-  // G) Son çare: cinayet komşusu tutuklama
-  if (arrestTargets.length) {
+  // G) Son çare: cinayet komşusu tutuklama (Hard modda izin verilmez)
+  if (!isStrictDeduction && arrestTargets.length) {
     const pool =
       deceasedCount > 0
         ? arrestTargets.filter(t => crimeAdjacencyToKillSites(t, killSites) > 0)
