@@ -20,6 +20,7 @@ import {
   applyStandardShift,
   applyStandardInspectorPickIdentity,
   applyStandardSolve,
+  applyStandardPass,
 } from './actionsStandard.js';
 import { DIFFICULTY } from './ai.js'; // Zorluk profilleri klasikle aynı
 
@@ -72,6 +73,21 @@ function crimeAdjacency(target, killSites) {
     if (dr <= 1 && dc <= 1 && (dr + dc > 0)) n++;
   }
   return n;
+}
+
+// Bir karakteri (örn. masum işaretli bir kartı) öldürmenin dedektif aday havuzunu
+// ne kadar iyi böleceğini ölçer. İdeal durum: komdu kümesi mevcut adayların
+// yaklaşık yarısını kapsıyorsa (hangi sonuç çıkarsa çıksın havuz ciddi daralır).
+// Komdu kümesi boşsa ya da tüm adayları kapsıyorsa, sonuç hemen hemen bilgisizdir.
+function killInfoSplitValue(board, suspectId, inspectorCandidates) {
+  if (!inspectorCandidates || inspectorCandidates.size === 0) return 0;
+  const neighborIds = new Set(getAliveNeighborsOfSuspect(board, suspectId).map((n) => n.cell.suspectId));
+  let overlap = 0;
+  for (const id of inspectorCandidates) {
+    if (neighborIds.has(id)) overlap++;
+  }
+  const half = inspectorCandidates.size / 2;
+  return half - Math.abs(overlap - half); // 0 = bilgisiz, half = mükemmel ikiye bölme
 }
 
 function scoreArrestTarget(target, killSites, cfg, candidates) {
@@ -323,7 +339,8 @@ export function runStandardAiTurn(game) {
         score += inspectorCandidates.size <= 3 ? 1000 : 100;
       }
       if (publicExonerated.includes(t.suspectId)) {
-        score += 500;
+        const splitValue = killInfoSplitValue(game.board, t.suspectId, inspectorCandidates);
+        score += 500 + splitValue * 20; // masum karakteri öldürmek her zaman değerli, ama iyi bölünme sağladığında daha da değerli
       }
       const tPos = positionOf(game.board, t.suspectId);
       if (tPos && killSitesNow.length > 0) {
@@ -425,6 +442,22 @@ export function runStandardAiTurn(game) {
       const clusterGain = clusterScore - newCluster;
 
       let shiftScore = distGain * 20 + clusterGain * 12 + (Math.random() - 0.5) * 10;
+
+      // Masum işaretli (henüz öldürülmemiş) bir karakteri, öldürüldüğünde dedektif
+      // aday havuzunu iyi bölecek bir konuma getirmek için pozisyon avantajı ara.
+      // Böylece katil o karakteri hemen orada öldürmek yerine, önce daha bilgilendirici
+      // bir noktaya taşımayı tercih edebiliyor.
+      let huntExoneratedBonus = 0;
+      for (const exId of publicExonerated) {
+        if ((game.killedSuspectIds ?? []).includes(exId)) continue;
+        const exPosAfter = positionOf(tempBoard, exId);
+        if (!exPosAfter) continue;
+        if (chebyshev(newKillerPos.r, newKillerPos.c, exPosAfter.r, exPosAfter.c) === 1) {
+          const splitValue = killInfoSplitValue(tempBoard, exId, inspectorCandidates);
+          huntExoneratedBonus = Math.max(huntExoneratedBonus, splitValue * 8);
+        }
+      }
+      shiftScore += huntExoneratedBonus;
       
       // Kılık değiştirme planımız varsa, yedek kılığı merkeze çekmek harika bir hamledir
       if (shouldDisguise && !isDisguiseDead && disguisePos) {
@@ -527,7 +560,9 @@ export function runStandardAiTurn(game) {
       if (ok) return next;
     }
 
-    return game;
+    // Gerçekten hiçbir hamle mümkün değilse (öldürme yok, kaydırma yok, disguise
+    // yok/ölmüş): oyunun katil tarafında kilitlenmemesi için turu güvenle geç.
+    return applyStandardPass(game).game;
   }
 
   // ── Dedektif turu ──
@@ -582,10 +617,28 @@ export function runStandardAiTurn(game) {
 
   const isMatchPoint = deceasedCount >= STANDARD_KILLER_WIN_DEATH_COUNT - 1;
 
-  if (isMatchPoint || (shouldSolve(game, scoredTargets, cfg, deceasedCount, killerCandidates, disguiseCandidates) && scoredTargets.length)) {
-    const identityGuessId = scoredTargets.length > 0
-      ? scoredTargets[0].suspectId
-      : (Array.from(killerCandidates)[0] || pickRandom(game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId)));
+  if (isMatchPoint) {
+    // Maç sayısı: katil bir sonraki turda neredeyse kesin kazanacak. Dedektif
+    // MUTLAKA kararlı bir hamle yapmalı. Öncelik sırası:
+    //  1) Güvenli tutuklama — yanlış çıksa bile oyun bitmez, tur devam eder.
+    //  2) Solve — sadece net bir tutuklama adayı yoksa ya da kimlik+kılık zaten
+    //     tam olarak daralmışsa (bu durumda solve zaten neredeyse garanti doğru).
+    //     Solve yanlış çıkarsa oyun anında biter, bu yüzden son çare olarak kullanılır.
+    const confidentTop = scoredTargets.length > 0 ? scoredTargets[0] : null;
+    const hasConfidentArrest =
+      confidentTop &&
+      confidentTop.isCandidate &&
+      (isVeryNarrowed || confidentTop.score >= cfg.patternWeight * 1.2);
+
+    if (hasConfidentArrest) {
+      const { ok, game: next } = applyStandardAccuse(game, confidentTop.suspectId, game.killer.identitySuspectId, secretId);
+      if (ok) return next;
+    }
+
+    const identityGuessId =
+      confidentTop?.suspectId ??
+      Array.from(killerCandidates)[0] ??
+      pickRandom(game.board.flat().filter(c => c && c.status === 'alive').map(c => c.suspectId));
 
     if (identityGuessId) {
       const disguiseGuess = guessDisguise(game, identityGuessId, killSites, cfg, new Set([...disguiseCandidates].filter(id => id !== identityGuessId)));
@@ -593,6 +646,13 @@ export function runStandardAiTurn(game) {
         const { ok, game: next } = applyStandardSolve(game, identityGuessId, disguiseGuess);
         if (ok) return next;
       }
+    }
+  } else if (shouldSolve(game, scoredTargets, cfg, deceasedCount, killerCandidates, disguiseCandidates) && scoredTargets.length) {
+    const identityGuessId = scoredTargets[0].suspectId;
+    const disguiseGuess = guessDisguise(game, identityGuessId, killSites, cfg, new Set([...disguiseCandidates].filter(id => id !== identityGuessId)));
+    if (disguiseGuess) {
+      const { ok, game: next } = applyStandardSolve(game, identityGuessId, disguiseGuess);
+      if (ok) return next;
     }
   }
 

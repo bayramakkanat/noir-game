@@ -350,6 +350,15 @@ export function applyStandardShift(game, axis, index, direction) {
   return { ok: true, game: next };
 }
 
+// ─── Pas geç (son çare) ───────────────────────────────────────────────────────────
+// Katilin hiçbir geçerli hamlesi (öldürme / kaydırma / kılık değiştirme) kalmadığı
+// uç durumlarda oyunun katil tarafında kilitlenmemesi için turu güvenle dedektife geçirir.
+export function applyStandardPass(game) {
+  let next = addLog(game, `⏭️ Katil hiçbir geçerli hamle yapamadı, tur geçildi.`);
+  next = advanceTurn(next);
+  return { ok: true, game: next };
+}
+
 // ─── Inspector kimlik seçimi ──────────────────────────────────────────────────
 export function applyStandardInspectorPickIdentity(game, cardSuspectId) {
   if (game.phase !== PHASE.INSPECTOR_PICK_IDENTITY) return { ok: false, game };
