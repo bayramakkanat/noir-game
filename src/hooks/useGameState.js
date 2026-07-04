@@ -36,11 +36,11 @@ import {
 export function useGameState() {
   const [game, setGame] = useState(null);
 
-  const startGame = useCallback((role, gameMode = GAME_MODE.CLASSIC) => {
+  const startGame = useCallback((role, gameMode = GAME_MODE.CLASSIC, difficulty = 'normal') => {
     if (gameMode === GAME_MODE.STANDARD) {
-      setGame(createStandardGame(role));
+      setGame(createStandardGame(role, difficulty));
     } else {
-      setGame(createClassicGame(role));
+      setGame(createClassicGame(role, difficulty));
     }
   }, []);
 

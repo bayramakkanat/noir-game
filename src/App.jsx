@@ -216,10 +216,12 @@ export default function App() {
   const solo = useGameState();
   const multi = usePeerMultiplayer();
 
-  // Oyun ekranında (aktif oyun varken) muzik durur, diger tum ekranlarda calar
   const soloInGame  = mode === 'solo'  && !!solo.game  && !solo.game.gameOver;
   const multiInGame = mode === 'multi' && !!multi.game && !multi.game.gameOver && multi.status === 'playing';
-  useBgMusic(!soloInGame && !multiInGame && !isMuted);
+  const inGame = soloInGame || multiInGame;
+  
+  // Müzik her zaman çalsın (eğer sessize alınmadıysa). Oyun içindeyken ses %50 kısılsın.
+  useBgMusic(!isMuted, inGame ? 0.5 : 1.0);
 
   if (mode === 'menu') {
     return <div className="grain"><MainMenu onSelect={setMode} isMuted={isMuted} onToggleMute={() => setIsMuted(!isMuted)} globalGameMode={globalGameMode} setGlobalGameMode={setGlobalGameMode} /></div>;
@@ -235,8 +237,10 @@ export default function App() {
         {soloScreen === 'game' && (
           <GameScreen
             game={solo.game}
+            isMuted={isMuted}
+            onToggleMute={() => setIsMuted(!isMuted)}
             onQuit={() => { solo.resetGame(); setMode('menu'); }}
-            onReset={() => { solo.startGame(solo.game.humanRole, globalGameMode); }}
+            onReset={() => { solo.startGame(solo.game.humanRole, globalGameMode, solo.game.difficulty); }}
             actions={{
               setPending: solo.setPending,
               cancelPending: solo.cancelPending,
@@ -283,6 +287,8 @@ export default function App() {
       <div className="grain">
         <GameScreen
           game={multi.game}
+          isMuted={isMuted}
+          onToggleMute={() => setIsMuted(!isMuted)}
           actions={{
             setPending: multi.setPending,
             cancelPending: multi.cancelPending,

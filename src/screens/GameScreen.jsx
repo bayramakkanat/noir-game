@@ -448,14 +448,14 @@ function BoardCell({ cell, r, c, game, actions, cellSize, arrestFlashId }) {
       
       // Dedektif rolü için
       if (humanRole === 'inspector' && turn === TURN.INSPECTOR) {
-        // Komşu, canlı birine tıklandıysa -> Tutukla (Arrest)
-        if (actions.isCoordTargetable(game, r, c, 'arrest', secrets)) {
-          actions.executeBoardAction(r, c, 'arrest');
-          return;
-        }
         // Eldeki masum kartlarından birine tahtada tıklandıysa -> Temize Çıkar (Exonerate)
         if (game.inspector.hand.includes(cell.suspectId)) {
           actions.completeExonerate(cell.suspectId);
+          return;
+        }
+        // Komşu, canlı birine tıklandıysa -> Tutukla (Arrest)
+        if (actions.isCoordTargetable(game, r, c, 'arrest', secrets)) {
+          actions.executeBoardAction(r, c, 'arrest');
           return;
         }
       }
@@ -1152,6 +1152,12 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
               🏠
             </button>
           )}
+          {onToggleMute && (
+            <button onClick={onToggleMute} title={isMuted ? 'Müziği aç' : 'Müziği kapat'}
+              className="w-7 h-7 rounded-lg border border-noir-border/40 bg-white/[0.03] text-sm text-[#9090A8] hover:text-white transition-all flex items-center justify-center">
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+          )}
           <button onClick={toggleFullscreen} title={isFullscreen ? 'Küçült' : 'Tam ekran'}
             className="w-7 h-7 rounded-lg border border-noir-border/40 bg-white/[0.03] text-sm text-[#9090A8] hover:text-white transition-all flex items-center justify-center">
             ⛶
@@ -1455,7 +1461,7 @@ function ActionPanel({ game, actions, onQuit, panelWidth = 320, cardSize = 74, i
 }
 
 // ─── Ana GameScreen ───────────────────────────────────────────────────────────
-export default function GameScreen({ game, actions, onQuit, onReset, isMultiplayer }) {
+export default function GameScreen({ game, actions, onQuit, onReset, isMultiplayer, isMuted, onToggleMute }) {
   if (!game || !game.board) {
     return <div className="min-h-screen flex items-center justify-center bg-[#09090F]"><div className="text-white/50">Oyun yükleniyor...</div></div>;
   }

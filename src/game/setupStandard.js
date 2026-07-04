@@ -18,7 +18,7 @@ function suspectName(id) {
   return SUSPECTS.find(s => s.id === id)?.name ?? `#${id}`;
 }
 
-export function createStandardGame(humanRole) {
+export function createStandardGame(humanRole, difficulty = 'normal') {
   const board = createBoardFromLayout(buildAlphabeticalLayout());
   let deck = shuffle(createEvidenceDeck());
 
@@ -46,6 +46,7 @@ export function createStandardGame(humanRole) {
 
   return {
     gameMode: GAME_MODE.STANDARD,
+    difficulty,
     board,
     phase: PHASE.KILLER_FIRST_KILL,
     turn: TURN.KILLER,

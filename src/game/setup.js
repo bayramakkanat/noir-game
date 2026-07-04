@@ -3,7 +3,7 @@ import { buildAlphabeticalLayout, createBoardFromLayout } from './board.js';
 import { createEvidenceDeck, shuffle, drawCards } from './deck.js';
 import { SUSPECTS } from '../data/suspects.js';
 
-export function createClassicGame(humanRole) {
+export function createClassicGame(humanRole, difficulty = 'normal') {
   const board = createBoardFromLayout(buildAlphabeticalLayout());
   let deck = shuffle(createEvidenceDeck());
 
@@ -30,6 +30,7 @@ export function createClassicGame(humanRole) {
 
   return {
     gameMode: GAME_MODE.CLASSIC,
+    difficulty,
     board,
     phase: PHASE.KILLER_FIRST_KILL,
     turn: TURN.KILLER,

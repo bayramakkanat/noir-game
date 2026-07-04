@@ -5,7 +5,7 @@ import spyMusic from '../assets/spy.mp3';
  * Arka plan müziğini yönetir.
  * play=true olduğunda müzik loop olarak çalar, false olduğunda fade out ile durur.
  */
-export function useBgMusic(play) {
+export function useBgMusic(play, volumeScale = 1.0) {
   const audioRef = useRef(null);
   const fadeRef  = useRef(null);
 
@@ -17,7 +17,7 @@ export function useBgMusic(play) {
     }
 
     const audio = audioRef.current;
-    let isActive = true; // Hook'un hala 'play' modunda geçerli olup olmadığını takip eder
+    let isActive = true;
 
     if (fadeRef.current) {
       clearInterval(fadeRef.current);
@@ -31,7 +31,7 @@ export function useBgMusic(play) {
     if (play) {
       const startFadeIn = () => {
         if (!isActive) return;
-        const target = 0.5;
+        const target = 0.5 * volumeScale;
         const step   = target / 30;
         if (fadeRef.current) clearInterval(fadeRef.current);
         fadeRef.current = setInterval(() => {
@@ -39,12 +39,15 @@ export function useBgMusic(play) {
              clearInterval(fadeRef.current);
              return;
           }
-          if (audio.volume + step >= target) {
+          // Eğer volume hedeften büyükse (örneğin menüden oyuna geçerken sesin kısılması gerekiyorsa)
+          if (Math.abs(audio.volume - target) < 0.05) {
             audio.volume = target;
             clearInterval(fadeRef.current);
             fadeRef.current = null;
-          } else {
-            audio.volume += step;
+          } else if (audio.volume < target) {
+            audio.volume = Math.min(target, audio.volume + step);
+          } else if (audio.volume > target) {
+            audio.volume = Math.max(target, audio.volume - step);
           }
         }, 50);
       };
@@ -56,7 +59,6 @@ export function useBgMusic(play) {
         }
         startFadeIn();
       }).catch(() => {
-        // Mobil dahil tüm etkileşim eventlerini dinle (capture phase)
         resumeRef = () => {
           if (!isActive) return;
           audio.play().then(() => {
@@ -69,9 +71,7 @@ export function useBgMusic(play) {
               EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
               eventsAdded = false;
             }
-          }).catch(() => {
-            // Eğer Safari touchstart'ı geçerli saymazsa başarısız olur.
-          });
+          }).catch(() => {});
         };
 
         EVENTS.forEach(e => window.addEventListener(e, resumeRef, { capture: true }));
@@ -107,5 +107,5 @@ export function useBgMusic(play) {
         EVENTS.forEach(e => window.removeEventListener(e, resumeRef, true));
       }
     };
-  }, [play]);
+  }, [play, volumeScale]);
 }
