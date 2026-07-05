@@ -268,8 +268,8 @@ export default function EndScreen({ game, onReset }) {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="font-mono text-[10px] tracking-[0.4em] uppercase mb-3"
-          style={{ color: accentColor }}
+          className="font-mono text-[10px] tracking-[0.4em] uppercase mb-3 px-3 py-1 rounded-full"
+          style={{ color: accentColor, background: 'rgba(8,8,14,0.75)', border: `1px solid ${accentColor}55` }}
         >
           — Dava Kapandı —
         </motion.div>
@@ -290,7 +290,8 @@ export default function EndScreen({ game, onReset }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className={`font-mono text-sm tracking-widest uppercase mb-6 ${playerWon ? 'text-[#D4A017]' : 'text-[#888898]'}`}
+          className={`font-mono text-sm tracking-widest uppercase mb-6 px-3 py-1 rounded-full ${playerWon ? 'text-[#D4A017]' : 'text-[#888898]'}`}
+          style={{ background: 'rgba(8,8,14,0.75)', border: `1px solid ${playerWon ? '#D4A01755' : '#88889855'}` }}
         >
           {playerWon ? '✦ Sen Kazandın ✦' : '✦ Sen Kaybettin ✦'}
         </motion.div>
