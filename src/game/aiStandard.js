@@ -128,21 +128,35 @@ function evaluateInspectorPos(game, board, killSites) {
   const aliveNeighborsCount = getAliveNeighborsOfSuspect(board, secretId)
     .filter(n => !publicExonerated.includes(n.cell.suspectId)).length;
 
-  // Avlanma (Hunting) Skoru: Katilin kimliğini %100 biliyorsak, ona olan mesafemiz
+  // Avlanma (Hunting) Skoru: Katilin kimliğini daralttıysak (<= 6 aday), onlara olan mesafe
   let distToConfirmedKiller = Infinity;
-  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 2) {
+  let candidateExposure = 0;
+
+  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 8) {
     for (const candId of game.killerCandidates) {
       const posCand = positionOf(board, candId);
       if (posCand) {
-        const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
-        if (d < distToConfirmedKiller) {
-          distToConfirmedKiller = d;
+        if (game.killerCandidates.length <= 6) {
+          const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
+          if (d < distToConfirmedKiller) {
+            distToConfirmedKiller = d;
+          }
+        }
+        
+        // Katili canlıların bol olduğu ve tuzaklı (masum) bölgelere çekme isteği
+        const aliveNeighbors = getAliveNeighborsOfSuspect(board, candId);
+        candidateExposure += aliveNeighbors.length;
+        for (const n of aliveNeighbors) {
+          if (publicExonerated.includes(n.cell.suspectId)) {
+            candidateExposure += 3; // Masum işaretli kişilere komşu olmak katil için mayın tarlasıdır!
+          }
         }
       }
     }
+    candidateExposure = candidateExposure / game.killerCandidates.length;
   }
 
-  return { avgKillDist, crimeArrestCount, aliveNeighborsCount, distToConfirmedKiller };
+  return { avgKillDist, crimeArrestCount, aliveNeighborsCount, distToConfirmedKiller, candidateExposure };
 }
 
 function scoreShiftMove(game, move, killSites, cfg) {
@@ -156,18 +170,42 @@ function scoreShiftMove(game, move, killSites, cfg) {
 
   let huntingBonus = 0;
   if (after.distToConfirmedKiller < before.distToConfirmedKiller) {
-    huntingBonus = -30;
+    huntingBonus = -40;
   }
   if (after.distToConfirmedKiller <= 1 && before.distToConfirmedKiller > 1) {
-    huntingBonus -= 50;
+    huntingBonus -= 60;
   }
+  
+  // Zor modda, eğer katili avlıyorsak (huntingBonus aktifse) gizliliği umursama!
+  const isHard = game.difficulty === 'hard';
+  let stealthPenalty = (after.aliveNeighborsCount - before.aliveNeighborsCount) * 4;
+  if (isHard && (huntingBonus < 0 || (game.killerCandidates && game.killerCandidates.length <= 6))) {
+    stealthPenalty = 0; // Avcı modundayken ölülerin arasına girmekten korkma
+  }
+
+  // Kendi bulunduğumuz satırı/sütunu kaydırarak katilin yanına gitmek, katile "ben geldim" demektir.
+  // Katili kendi güvenli bölgemize çekmek (katilin satır/sütununu kaydırmak) çok daha güvenlidir!
+  let exposingPenalty = 0;
+  const myPos = positionOf(game.board, game.inspector.secretIdentitySuspectId);
+  if (myPos && ((move.axis === 'row' && move.index === myPos.r) || (move.axis === 'col' && move.index === myPos.c))) {
+    // Eğer aktif olarak katile yaklaşıyorsak (huntingBonus), kendi yerimizi belli etmek İNTİHARDIR. Asla yapma!
+    if (huntingBonus < 0) {
+      exposingPenalty = 500; 
+    } else {
+      exposingPenalty = 50; // Normal durumlarda da kendi yerini değiştirmekten hafifçe kaçın
+    }
+  }
+
+  const exposureGain = (after.candidateExposure ?? 0) - (before.candidateExposure ?? 0);
 
   const score =
     after.avgKillDist * 2 -
     (after.crimeArrestCount - before.crimeArrestCount) * 5 -
-    (after.aliveNeighborsCount - before.aliveNeighborsCount) * 4 +
-    huntingBonus -
-    (before.avgKillDist - after.avgKillDist) * 3 +
+    stealthPenalty +
+    huntingBonus +
+    exposingPenalty -
+    exposureGain * 5 -
+    (before.avgKillDist - after.avgKillDist) * 4 +
     (Math.random() - 0.5) * cfg.noiseLevel * 0.15;
 
   return { score, distGain: before.avgKillDist - after.avgKillDist, arrestGain: after.crimeArrestCount - before.crimeArrestCount, huntingBonus };
@@ -239,8 +277,18 @@ function guessDisguise(game, guessIdentityId, killSites, cfg, disguiseCandidates
       const avgDist = killSites.reduce((s, site) => s + chebyshev(pos.r, pos.c, site.r, site.c), 0) / killSites.length;
       pattern = 1 / (avgDist + 0.5);
     }
+    
+    let score = cfg.adjacencyWeight * adj + cfg.patternWeight * pattern;
+    
+    // Ölü karakterleri yedek kılık olarak tahmin etme ihtimalini DÜŞÜR.
+    // Katiller genellikle kendi yedek kılıklarını öldürmezler (çok nadir bir blöftür).
+    const isDead = (game.killedSuspectIds ?? []).includes(id);
+    if (isDead) {
+      score -= 500; // Ölüleri tahmin etmeyi bırak
+    }
+
     const noise = (Math.random() - 0.5) * cfg.noiseLevel;
-    return { id, score: cfg.adjacencyWeight * adj + cfg.patternWeight * pattern + noise };
+    return { id, score: score + noise };
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -338,11 +386,27 @@ export function runStandardAiTurn(game) {
       if (inspectorCandidates.has(t.suspectId)) {
         score += inspectorCandidates.size <= 3 ? 1000 : 100;
       }
-      if (publicExonerated.includes(t.suspectId)) {
-        const splitValue = killInfoSplitValue(game.board, t.suspectId, inspectorCandidates);
-        score += 500 + splitValue * 20; // masum karakteri öldürmek her zaman değerli, ama iyi bölünme sağladığında daha da değerli
-      }
+
       const tPos = positionOf(game.board, t.suspectId);
+      
+      let inspectorAdjCount = 0;
+      for (const candId of inspectorCandidates) {
+        const cpos = positionOf(game.board, candId);
+        if (cpos && tPos && chebyshev(tPos.r, tPos.c, cpos.r, cpos.c) <= 1) {
+           inspectorAdjCount++;
+        }
+      }
+
+      if (publicExonerated.includes(t.suspectId)) {
+        if (inspectorAdjCount > 0) {
+          // Bu masumu öldürmek bize dedektifin yeri hakkında taze bilgi (silüet) verecek!
+          score += 500; 
+        } else {
+          // Bu masumun etrafındaki herkes zaten adaylıktan elenmiş. Buradan yeni bilgi çıkmaz.
+          score += 50; 
+        }
+      }
+
       if (tPos && killSitesNow.length > 0) {
         let minDist = Infinity;
         for (const site of killSitesNow) {
@@ -354,7 +418,6 @@ export function runStandardAiTurn(game) {
         else score -= minDist * 5;
       }
 
-      let inspectorAdjCount = 0;
       for (const candId of inspectorCandidates) {
         const cpos = positionOf(game.board, candId);
         if (cpos && chebyshev(tPos.r, tPos.c, cpos.r, cpos.c) <= 1) {
@@ -532,7 +595,18 @@ export function runStandardAiTurn(game) {
       }
     }
 
-    // 4. Normal durum: çoğunlukla öldür ama düzenli aralıklarla kılık değiştir/kaydır
+    // 4. Avlanma veya Stratejik Pozisyon Alma (Çok İyi Bir Kaydırma Fırsatı)
+    // Eğer yanımızda öldürecek çok değerli biri (hedef puanı >= 400) yoksa, 
+    // ama tahtayı kaydırarak bize harika bir ipucu verecek birini (veya çok iyi bir pozisyonu) 
+    // yanımıza çekebiliyorsak (shiftScore >= 20), o zaman kesinlikle kaydır!
+    const bestTargetScore = targets.length > 0 ? targets[0].score : 0;
+    if (bestKillerShift && bestKillerShiftScore >= 20 && bestTargetScore < 400) {
+      if (Math.random() < 0.85) { // %85 ihtimalle bu harika kaydırmayı yap
+        return applyStandardShift(game, bestKillerShift.axis, bestKillerShift.index, bestKillerShift.direction).game;
+      }
+    }
+
+    // 5. Normal durum: çoğunlukla öldür ama düzenli aralıklarla kılık değiştir/kaydır
     const disguisePriority = shouldDisguise ? 0.22 : 0;
     const shiftPriority    = (!shouldDisguise && shiftWorthIt) ? (0.12 + (inspectorClose ? 0.1 : 0)) : 0;
 
@@ -615,7 +689,21 @@ export function runStandardAiTurn(game) {
     return pickRandom(best.length ? best : scoredTargets);
   };
 
-  const isMatchPoint = deceasedCount >= STANDARD_KILLER_WIN_DEATH_COUNT - 1;
+  // Katilin bir sonraki turda cinayet işleme ihtimali var mı?
+  // Eğer tüm katil adaylarının etrafı tamamen cesetlerle kaplıysa (hiç canlı komşuları yoksa),
+  // katil istese de cinayet işleyemez ve mecburen kaydırma/kılık değiştirme yapacaktır.
+  let killerCanKill = false;
+  for (const candId of killerCandidates) {
+    const aliveNeighbors = getAliveNeighborsOfSuspect(game.board, candId);
+    if (aliveNeighbors.length > 0) {
+      killerCanKill = true;
+      break;
+    }
+  }
+
+  // Maç puanı: Katil 8 cinayete ulaştıysa VE bir sonraki turda cinayet işleyebilecek durumdaysa!
+  // Eğer katil köşeye sıkıştıysa (etrafı ölülerle doluysa), dedektif paniğe kapılıp rastgele Solve YAPMAMALIDIR.
+  const isMatchPoint = deceasedCount >= STANDARD_KILLER_WIN_DEATH_COUNT - 1 && killerCanKill;
 
   if (isMatchPoint) {
     // Maç sayısı: katil bir sonraki turda neredeyse kesin kazanacak. Dedektif
@@ -705,10 +793,30 @@ export function runStandardAiTurn(game) {
     }
   }
 
-  const deadInHand = game.inspector.hand.filter(id => killedIds.has(id));
-  if (deadInHand.length > 0 && game.evidenceDeck.length > 0) {
-    const { ok, game: next } = applyStandardExonerate(game, pickRandom(deadInHand), game.killer.identitySuspectId);
-    if (ok) return next;
+
+
+  // Katil kazanmaya yaklaştıysa (5+ cinayet) ve adayları daralttıysak (<=6), ama hiçbirine komşu değilsek:
+  // Masum işaretlemekle (Exonerate) vakit KAYBEDEMEYİZ! Acilen tahtayı kaydırıp onları yanımıza çekmeliyiz!
+  let isPanicHunting = false;
+  if (deceasedCount >= 5 && killerCandidates.size > 0 && killerCandidates.size <= 6) {
+    let adjacentToAnyCandidate = false;
+    const myPos = positionOf(game.board, secretId);
+    if (myPos) {
+      for (const candId of killerCandidates) {
+        const cpos = positionOf(game.board, candId);
+        if (cpos && chebyshev(myPos.r, myPos.c, cpos.r, cpos.c) <= 1) {
+          adjacentToAnyCandidate = true;
+          break;
+        }
+      }
+    }
+    if (!adjacentToAnyCandidate) {
+      isPanicHunting = true;
+    }
+  }
+
+  if (isPanicHunting && shiftMove) {
+    return applyStandardShift(game, shiftMove.axis, shiftMove.index, shiftMove.direction).game;
   }
 
   let exonerateChance = cfg.exonerateP;
@@ -749,8 +857,15 @@ export function runStandardAiTurn(game) {
         }
       }
 
-      const { ok, game: next } = applyStandardExonerate(game, bestCardId, game.killer.identitySuspectId);
-      if (ok) return next;
+      // Zor modda: Eğer elimizdeki hiçbir kart katil adaylarına komşu değilse (bestInfoScore === 0)
+      // ve tahtayı kaydırabiliyorsak, Exonerate'i boşa harcamak yerine önce kaydırmayı tercih edelim!
+      const isHard = game.difficulty === 'hard';
+      const wasteExonerate = isHard && bestInfoScore === 0 && killerCandidates.size < 20;
+
+      if (!wasteExonerate) {
+        const { ok, game: next } = applyStandardExonerate(game, bestCardId, game.killer.identitySuspectId);
+        if (ok) return next;
+      }
     }
   }
 
@@ -789,5 +904,14 @@ export function runStandardAiTurn(game) {
     return applyStandardAccuse(game, pickRandom(scoredTargets).suspectId, game.killer.identitySuspectId, secretId).game;
   }
 
-  return game;
+  // Eğer yukarıdaki hiçbir mantıklı hamleyi yapamadıysak ve elimizde ölü kartlar varsa,
+  // en son çare olarak bu ölü kartları çöpe atıp elimizi yenileyelim. (Asla öncelikli yapma!)
+  const deadInHand = game.inspector.hand.filter(id => killedIds.has(id));
+  if (deadInHand.length > 0 && game.evidenceDeck.length > 0) {
+    const { ok, game: next } = applyStandardExonerate(game, pickRandom(deadInHand), game.killer.identitySuspectId);
+    if (ok) return next;
+  }
+
+  // Bütün elimizdeki kartlar ölüyse ve deste bitmişse mecburen pas geçeriz.
+  return applyStandardPass(game).game;
 }
