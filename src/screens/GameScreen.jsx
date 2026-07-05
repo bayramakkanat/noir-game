@@ -1014,13 +1014,19 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
       }}
     >
       <div className="relative z-10 text-center mb-5 mt-2">
-        <div className="font-mono text-[10px] tracking-[0.4em] uppercase mb-2" style={{ color: accentColor }}>
+        <div
+          className="inline-block font-mono text-[10px] tracking-[0.4em] uppercase mb-2 px-3 py-1 rounded-full"
+          style={{ color: accentColor, background: 'rgba(9,9,15,0.75)', border: `1px solid ${accentColor}55` }}
+        >
           — Dava Kapandı —
         </div>
         <h2 className="font-display text-3xl font-bold mb-1" style={{ color: accentColor, textShadow: `0 0 20px ${accentColor}44` }}>
           {killerWon ? 'KATİL KAZANDI' : 'DEDEKTİF KAZANDI'}
         </h2>
-        <div className={`font-mono text-xs tracking-widest uppercase mt-2 ${playerWon ? 'text-[#D4A017]' : 'text-[#888898]'}`}>
+        <div
+          className={`inline-block font-mono text-xs tracking-widest uppercase mt-2 px-3 py-1 rounded-full ${playerWon ? 'text-[#D4A017]' : 'text-[#888898]'}`}
+          style={{ background: 'rgba(9,9,15,0.75)', border: `1px solid ${playerWon ? '#D4A01755' : '#88889855'}` }}
+        >
           {playerWon ? '✦ Sen Kazandın ✦' : '✦ Sen Kaybettin ✦'}
         </div>
       </div>
