@@ -96,9 +96,8 @@ export function HeroCard({ suspect, label, labelColor = '#E8E6DC', isWinner = fa
         className="mt-2 font-mono font-bold text-[10px] tracking-widest uppercase px-2 py-0.5 rounded"
         style={{
           color: labelColor,
-          background: 'rgba(8,8,14,0.85)',
-          textShadow: `0 0 6px ${labelColor}, 0 0 14px ${labelColor}BB`,
-          filter: 'brightness(1.4)',
+          background: 'rgba(8,8,14,0.9)',
+          border: `1px solid ${labelColor}55`,
         }}
       >
         {label}
@@ -343,7 +342,7 @@ export default function EndScreen({ game, onReset }) {
           >
             <div
               className="font-mono text-[9px] tracking-[0.3em] uppercase mb-1 px-2 py-0.5 rounded"
-              style={{ color: '#C0392B', background: 'rgba(8,8,14,0.85)', textShadow: '0 0 6px #C0392B, 0 0 14px #C0392BBB', filter: 'brightness(1.4)' }}
+              style={{ color: '#C0392B', background: 'rgba(8,8,14,0.9)', border: '1px solid #C0392B55' }}
             >
               Katilin Yedek Kılığı
             </div>
