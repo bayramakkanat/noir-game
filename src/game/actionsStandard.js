@@ -114,6 +114,17 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
+  // ÖNCE oyunun bu hamleyle bitiş kontrolü — bitiyorsa satır/sütun temizliğini HİÇ yapma.
+  // Aksi halde oyunu bitiren son kurban (ör. dedektifin kimliği) tam da o satır/sütunu
+  // "tamamen ölü" yapıp null'a düşürüyor ve oyun sonu ekranında / tahta açılışında o
+  // karakter tamamen kayboluyordu. Oyun bittikten sonra zaten kimse kaydırma
+  // yapmayacağı için tahtayı küçültmenin hiçbir oyun amaçlı faydası yok, sadece son
+  // pozisyonları gizliyor.
+  const gameEndCheck = applyWinChecks(next, inspectorSecretId);
+  if (gameEndCheck.gameOver) {
+    return { ok: true, game: gameEndCheck };
+  }
+
   const { board: cleaned, removedRows, removedCols } = removeEmptyRowsAndCols(boardAfterMark);
   if (removedRows.length > 0 || removedCols.length > 0) {
     next = { ...next, board: cleaned };
@@ -123,9 +134,8 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     next = addLog(next, `🧹 Tüm karakterler öldü — ${parts.join(' ve ')} tahtadan kaldırıldı.`);
   }
 
-  // Win kontrolü — sadece burada çağrılır
-  next = applyWinChecks(next, inspectorSecretId);
-  if (next.gameOver) return { ok: true, game: next };
+  // Win kontrolü zaten yukarıda yapıldı (gameEndCheck ile) — tekrar değişiklik yok,
+  // sadece devam ediyoruz çünkü bu noktada oyun kesin bitmemiş demektir.
 
   if (isExonerated) {
     // Komşuluk kontrolü öldürme ÖNCESİ board üzerinde yapılmalı
