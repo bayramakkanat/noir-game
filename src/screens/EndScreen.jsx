@@ -15,29 +15,44 @@ function getCharacterImage(id) {
   return key ? characterImages[key].default : null;
 }
 
-export function HeroCard({ suspect, label, labelColor = '#E8E6DC', dim = false, stamp = null }) {
+export function HeroCard({ suspect, label, labelColor = '#E8E6DC', isWinner = false, stamp = null }) {
   const img = getCharacterImage(suspect.id);
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.88, y: 24 }}
-      animate={{ opacity: dim ? 0.45 : 1, scale: 1, y: 0 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 80, damping: 18, delay: 0.15 }}
       className="relative flex flex-col items-center"
     >
+      {isWinner && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.4, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 14, delay: 0.5 }}
+          className="absolute -top-3 -right-3 z-20 flex items-center justify-center w-8 h-8 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, #F0CC70 0%, #C8941F 100%)',
+            boxShadow: '0 0 16px rgba(212,160,23,0.85), 0 0 4px rgba(240,204,112,1)',
+            border: '2px solid #FCE7A8',
+          }}
+        >
+          <span style={{ fontSize: 15, lineHeight: 1 }}>👑</span>
+        </motion.div>
+      )}
       <div
         className="relative rounded-xl overflow-hidden border-2 shadow-2xl"
         style={{
           width: 140,
           height: 190,
-          borderColor: dim ? '#2A2A3E' : labelColor,
-          filter: dim ? 'grayscale(60%)' : 'none',
+          borderColor: isWinner ? '#D4A017' : labelColor,
+          boxShadow: isWinner ? '0 0 20px rgba(212,160,23,0.45)' : undefined,
         }}
       >
         {img ? (
           <img src={img} alt={suspect.name} className="w-full h-full object-cover object-top" draggable={false} />
         ) : (
           <div className="w-full h-full bg-noir-card flex items-center justify-center text-5xl">
-            {dim ? '🔍' : '🗡️'}
+            🕵️
           </div>
         )}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pb-2 px-2 text-center">
@@ -292,7 +307,7 @@ export default function EndScreen({ game, onReset }) {
                   suspect={killerSuspect}
                   label="Katilin Kimliği"
                   labelColor='#C0392B'
-                  dim={inspectorWon}
+                  isWinner={killerWon}
                   stamp={killerStamp}
                 />
               )}
@@ -312,7 +327,7 @@ export default function EndScreen({ game, onReset }) {
                   suspect={inspectorSuspect}
                   label="Dedektif"
                   labelColor={inspectorWon ? '#4090C8' : '#888898'}
-                  dim={killerWon && game.winReason !== 'inspector_killed'}
+                  isWinner={inspectorWon}
                   stamp={inspectorStamp}
                 />
               )}

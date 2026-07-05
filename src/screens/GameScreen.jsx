@@ -1008,7 +1008,7 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
       style={{ 
         scrollbarWidth: 'thin', 
         scrollbarColor: '#2A2A3E transparent',
-        backgroundImage: `linear-gradient(to bottom, rgba(9,9,15,0.7), rgba(9,9,15,0.95)), url(${gameOverBg})`,
+        backgroundImage: `linear-gradient(to bottom, rgba(9,9,15,0.18), rgba(9,9,15,0.5)), url(${gameOverBg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}
@@ -1031,7 +1031,7 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
             suspect={killerSuspect}
             label="Katilin Kimliği"
             labelColor='#C0392B'
-            dim={inspectorWon}
+            isWinner={killerWon}
             stamp={killerStamp}
           />
         )}
@@ -1040,7 +1040,7 @@ function GameOverPanel({ game, actions, onReset, onQuit }) {
             suspect={inspectorSuspect}
             label="Dedektif"
             labelColor={inspectorWon ? '#4090C8' : '#888898'}
-            dim={killerWon && game.winReason !== 'inspector_killed'}
+            isWinner={inspectorWon}
             stamp={inspectorStamp}
           />
         )}

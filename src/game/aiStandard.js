@@ -381,6 +381,12 @@ export function runStandardAiTurn(game) {
     // Dedektif bizim kimliğimizi matematiksel olarak (hançer uzaklıkları ile) çözdü mü?
     const exposedThreat = game.killerCandidates && game.killerCandidates.length <= 3;
 
+    // ÇARESİZLİK KONTROLÜ: Katil art arda kaç turdur sadece kaçıyor (disguise/shift/pass),
+    // hiç öldürmüyor? Sonsuza kadar saklanmak diye bir strateji yoktur — kazanma şartı
+    // sadece öldürerek ilerliyor. Belli bir eşiği geçince savunma mantığını bypass edip
+    // zorla saldırıya geçmelidir — aksi halde pasif oynayıp garanti kaybediyor.
+    const passiveStreak = game.killerPassiveStreak ?? 0;
+
     const targets = getKillTargets(game, killerIdentityId).map(t => {
       let score = 0;
       if (inspectorCandidates.has(t.suspectId)) {
@@ -442,6 +448,11 @@ export function runStandardAiTurn(game) {
       score += Math.random() * 15;
       return { ...t, score };
     }).sort((a, b) => b.score - a.score);
+
+    // Eşik aşıldıysa (3+ tur üst üste sadece kaçtıysa) ve geçerli bir hedef varsa,
+    // savunma mantığını atlayıp zorla saldırıya geç. Sonsuza kadar saklanmak
+    // garantili kayıp demektir — katil risk almak zorunda.
+    const mustPressAttack = passiveStreak >= 3 && targets.length > 0;
 
     // Kılık değiştirme değerlendirmesi (Artık daha agresif bir saldırı aracı)
     let disguiseScore = 0;
@@ -567,7 +578,8 @@ export function runStandardAiTurn(game) {
     }
 
     // 2. Tehdit altındaysak veya Deşifre olduysak: önce kaç (kılık değiştir veya kaydır)
-    if (inspectorThreat || exposedThreat) {
+    // AMA: çaresizlik eşiğini aştıysak (mustPressAttack) artık kaçmayı bırakıp saldırmalıyız.
+    if (!mustPressAttack && (inspectorThreat || exposedThreat)) {
       if (shouldDisguise && Math.random() < 0.75) {
         const { ok, game: next } = applyStandardDisguise(game);
         if (ok) return next;
@@ -577,8 +589,8 @@ export function runStandardAiTurn(game) {
       }
     }
 
-    // 3. Örüntü çok belirginse: kılık değiştir veya kaydır
-    if (clusterScore >= 2 || currentDeadCount >= 2) {
+    // 3. Örüntü çok belirginse: kılık değiştir veya kaydır (yine mustPressAttack varsa atla)
+    if (!mustPressAttack && (clusterScore >= 2 || currentDeadCount >= 2)) {
       const forceEscape = isHard ? 1.0 : 0.60;
       if (shouldDisguise && Math.random() < forceEscape) {
         const { ok, game: next } = applyStandardDisguise(game);
@@ -600,14 +612,15 @@ export function runStandardAiTurn(game) {
     // ama tahtayı kaydırarak bize harika bir ipucu verecek birini (veya çok iyi bir pozisyonu) 
     // yanımıza çekebiliyorsak (shiftScore >= 20), o zaman kesinlikle kaydır!
     const bestTargetScore = targets.length > 0 ? targets[0].score : 0;
-    if (bestKillerShift && bestKillerShiftScore >= 20 && bestTargetScore < 400) {
+    if (!mustPressAttack && bestKillerShift && bestKillerShiftScore >= 20 && bestTargetScore < 400) {
       if (Math.random() < 0.85) { // %85 ihtimalle bu harika kaydırmayı yap
         return applyStandardShift(game, bestKillerShift.axis, bestKillerShift.index, bestKillerShift.direction).game;
       }
     }
 
     // 5. Normal durum: çoğunlukla öldür ama düzenli aralıklarla kılık değiştir/kaydır
-    const disguisePriority = shouldDisguise ? 0.22 : 0;
+    // mustPressAttack aktifse kılık değiştirme önceliğini tamamen kapat — saldırmalıyız.
+    const disguisePriority = (!mustPressAttack && shouldDisguise) ? 0.22 : 0;
     const shiftPriority    = (!shouldDisguise && shiftWorthIt) ? (0.12 + (inspectorClose ? 0.1 : 0)) : 0;
 
     const roll = Math.random();

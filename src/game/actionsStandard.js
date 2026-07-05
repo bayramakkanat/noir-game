@@ -110,6 +110,7 @@ export function applyStandardKill(game, suspectId, killerIdentityId, inspectorSe
     killSites: killSite ? [...(game.killSites ?? []), killSite] : (game.killSites ?? []),
     publicExonerated: (game.publicExonerated ?? []).filter(id => id !== suspectId),
     killerCandidates,
+    killerPassiveStreak: 0, // öldürdü — pasiflik sayacı sıfırlanır
   };
   next = addLog(next, `🗡️ Öldürüldü: <b>${suspectName(suspectId)}</b>.`);
 
@@ -185,7 +186,7 @@ export function applyStandardDisguise(game) {
   // zaten yanlış tutukladım" hafızası kılık değiştirmeden bağımsız olarak korunmalı.
   // Aksi halde katil disguise yaptıkça aynı karakter tekrar tekrar (kalıcı dışlama
   // eşiğine hiç ulaşmadan) yanlış tutuklanabiliyordu.
-  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, killerCandidates: game.disguiseCandidates ?? null, disguiseCandidates: game.killerCandidates ?? null };
+  let next = { ...game, killer: newKiller, pendingAction: null, lastArrestedId: null, killerCandidates: game.disguiseCandidates ?? null, disguiseCandidates: game.killerCandidates ?? null, killerPassiveStreak: (game.killerPassiveStreak ?? 0) + 1 };
 
   if (game.humanRole === 'killer') {
     next = addLog(next, `⇄ Kılık değiştirdin. Yeni kimliğin: <b>${suspectName(disguiseSuspectId)}</b>.`);
@@ -344,6 +345,7 @@ export function applyStandardShift(game, axis, index, direction) {
     pendingAction: null,
     pendingShift: null,
     consecutiveArrests: 0,
+    killerPassiveStreak: game.turn === TURN.KILLER ? (game.killerPassiveStreak ?? 0) + 1 : game.killerPassiveStreak,
   };
   next = addLog(next, `↔ Tahta kaydırıldı (${axisTr} ${index + 1}, ${dirTr}).`);
   next = advanceTurn(next);
@@ -355,6 +357,7 @@ export function applyStandardShift(game, axis, index, direction) {
 // uç durumlarda oyunun katil tarafında kilitlenmemesi için turu güvenle dedektife geçirir.
 export function applyStandardPass(game) {
   let next = addLog(game, `⏭️ Katil hiçbir geçerli hamle yapamadı, tur geçildi.`);
+  next = { ...next, killerPassiveStreak: (game.killerPassiveStreak ?? 0) + 1 };
   next = advanceTurn(next);
   return { ok: true, game: next };
 }
