@@ -128,29 +128,39 @@ function evaluateInspectorPos(game, board, killSites) {
   const aliveNeighborsCount = getAliveNeighborsOfSuspect(board, secretId)
     .filter(n => !publicExonerated.includes(n.cell.suspectId)).length;
 
-  // Avlanma (Hunting) Skoru: Katilin kimliğini daralttıysak (<= 6 aday), onlara olan mesafe
+  // Avlanma (Hunting) Skoru: Katilin kimliğini daralttıysak, onlara olan mesafe.
+  // ESKİDEN sadece havuz <=6'ya inince aktifti (25 kişilik kadroda bu neredeyse
+  // hiç tetiklenmiyordu, dedektif oyunun büyük kısmında amaçsız kalıyordu).
+  // Eşiği genişlettik: artık orta büyüklükteki havuzlarda da (≤14) hafif bir
+  // yaklaşma isteği oluşuyor, sadece son derece daralmış (≤6) havuzda tam güvençle.
   let distToConfirmedKiller = Infinity;
   let candidateExposure = 0;
 
-  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 8) {
+  if (game.killerCandidates && game.killerCandidates.length > 0 && game.killerCandidates.length <= 14) {
     for (const candId of game.killerCandidates) {
       const posCand = positionOf(board, candId);
       if (posCand) {
-        if (game.killerCandidates.length <= 6) {
-          const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
+        const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
+        if (game.killerCandidates.length <= 10) {
           if (d < distToConfirmedKiller) {
             distToConfirmedKiller = d;
           }
         }
-        
-        // Katili canlıların bol olduğu ve tuzaklı (masum) bölgelere çekme isteği
+
+        // Katili canlıların bol olduğu ve tuzaklı (masum) bölgelere çekme isteği —
+        // AMA sadece bu "tuzak bölgesi" dedektifin kendi konumuna yakınsa bir işe yarar!
+        // Aksi halde katili kalabalık bir köşeye sıkıştırıp kendisi bambaşka bir
+        // köşede beklemiş olur — tuzak kurulur ama pusuda kimse olmaz. Uzaklıkla ters
+        // orantılı bir ağırlık ekleyerek, yalnızca kendi yakınındaki tuzakları önemsemesini sağlıyoruz.
+        const proximityWeight = 1 / (1 + d);
         const aliveNeighbors = getAliveNeighborsOfSuspect(board, candId);
-        candidateExposure += aliveNeighbors.length;
+        let localExposure = aliveNeighbors.length;
         for (const n of aliveNeighbors) {
           if (publicExonerated.includes(n.cell.suspectId)) {
-            candidateExposure += 3; // Masum işaretli kişilere komşu olmak katil için mayın tarlasıdır!
+            localExposure += 3; // Masum işaretli kişilere komşu olmak katil için mayın tarlasıdır!
           }
         }
+        candidateExposure += localExposure * proximityWeight;
       }
     }
     candidateExposure = candidateExposure / game.killerCandidates.length;
