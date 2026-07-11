@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { KILLER_WIN_DEATH_COUNT, STANDARD_KILLER_WIN_DEATH_COUNT } from '../game/constants.js';
-import dedektifImg from '../assets/dedektif.png';
 
 function RuleSection({ title, children }) {
   return (
@@ -208,7 +207,7 @@ function StandardRules() {
           <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
             <div className="flex flex-col items-center gap-1 shrink-0 w-14">
               <div className="w-10 h-12 rounded-lg border-2 border-red-400/60 bg-[#1A0A0A] flex items-center justify-center relative shadow-lg mx-auto">
-                <img src={dedektifImg} alt="Dedektif" className="w-7 h-7 object-contain" style={{ filter: 'invert(1)' }} />
+                <img src="/dedektif.png" alt="Dedektif" className="w-7 h-7 object-contain" style={{ filter: 'invert(1)' }} />
                 <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border border-[#1A0A0A]" />
               </div>
               <span className="font-mono text-[8px] text-red-400/70 tracking-wide">Öldürüldü</span>
@@ -216,7 +215,7 @@ function StandardRules() {
             <span className="text-[#4A4A5E] text-lg shrink-0 rotate-90 sm:rotate-0">→</span>
             <div className="flex-1 rounded-lg bg-blue-500/10 border border-blue-400/25 px-2.5 py-1.5">
               <p className="font-mono text-[9px] text-blue-300/80 leading-snug">
-                Karakterin üzerinde <img src={dedektifImg} alt="Dedektif" className="inline w-4 h-4 object-contain align-middle mx-0.5" style={{ filter: 'invert(1)' }} /> belirir → dedektifin gizli kimliği o karaktere <strong className="text-blue-300">komşu</strong> demektir.
+                Karakterin üzerinde <img src="/dedektif.png" alt="Dedektif" className="inline w-4 h-4 object-contain align-middle mx-0.5" style={{ filter: 'invert(1)' }} /> belirir → dedektifin gizli kimliği o karaktere <strong className="text-blue-300">komşu</strong> demektir.
               </p>
             </div>
           </div>

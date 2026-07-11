@@ -310,6 +310,10 @@ export function runStandardAiTurn(game) {
   if (game.gameOver || game.activeSide !== 'ai') return game;
 
   const cfg = DIFFICULTY[game.difficulty ?? 'normal'];
+  // Zorluk arttıkça katilin karar gürültüsünü de dedektifle simetrik şekilde azalt.
+  // 0.3 = normal moddaki cfg.noiseLevel taban değeri (mevcut sabit gürültü miktarları
+  // zaten normal mod için ayarlanmıştı); hard'da ~0.17x, easy'de ~4x gürültü olur.
+  const noiseScale = cfg.noiseLevel / 0.3;
 
   // ── Faz: İlk öldürme ──
   if (game.phase === PHASE.KILLER_FIRST_KILL) {
@@ -388,7 +392,22 @@ export function runStandardAiTurn(game) {
     const inspectorThreat = minInspectorDist <= 1 && tightPool;
     const inspectorClose  = minInspectorDist <= 2 && inspectorCandidates.size <= 8;
 
+    // Kimliğimiz dedektif tarafından daraltıldı mı (deşifre olacak kadar)? Bu durumda
+    // dedektif hangi karakterin biz olduğumuzu biliyor demektir ve tahtayı kaydırarak
+    // bizi kalabalık bir alana "kör atış" yapmaya zorlayabilir — özellikle biz board'un
+    // en dış satır/sütununda isek, çünkü dıştan içe doğru bir kaydırma bizi doğrudan
+    // merkezdeki kalabalık bölgeye taşır. Bkz. aşağıdaki kenar-kaçınma mantığı.
+    const identityNarrow = game.killerCandidates && game.killerCandidates.length <= 3;
+
+    // NOT: applyStandardAccuse (Tutukla), katilin SADECE o anki aktif kimliğini doğru
+    // tahmin etmeyi gerektirir — kılığı bilmesine hiç gerek yoktur! Kılık+kimlik ikisini
+    // birden doğru bilme zorunluluğu sadece Çöz (Solve) için geçerlidir (o da yanlışsa
+    // katili kazandırır, bu yüzden dedektif nadiren dener). Yani kimliğimiz TEK BAŞINA
+    // daralmış olduğunda bile Tutukla riski gerçek ve acildir — kılık güvende olsa bile.
+    const disguiseCandidatesLen = game.disguiseCandidates?.length ?? Infinity;
+    const disguiseAlsoExposed = disguiseCandidatesLen > 0 && disguiseCandidatesLen <= 3;
     // Dedektif bizim kimliğimizi matematiksel olarak (hançer uzaklıkları ile) çözdü mü?
+    // (Tutukla riski — tek başına yeterli, kılık durumundan bağımsız.)
     const exposedThreat = game.killerCandidates && game.killerCandidates.length <= 3;
 
     // ÇARESİZLİK KONTROLÜ: Katil art arda kaç turdur sadece kaçıyor (disguise/shift/pass),
@@ -447,7 +466,12 @@ export function runStandardAiTurn(game) {
       }
 
       if (t.suspectId === disguiseSuspectId) {
-        if (inspectorCandidates.size > 4 && killCountNow < 7) {
+        if (disguiseAlsoExposed) {
+          // Yedek kılığımız da artık ciddi bir Çöz adayıysa, onu kendimiz öldürerek
+          // Çöz hamlesini kalıcı olarak imkânsız kılalım — kılık artık asla değişemez
+          // ama bu, aksi halde neredeyse kesin bir yakalanmadan çok daha iyi bir sonuçtur.
+          score += 400;
+        } else if (inspectorCandidates.size > 4 && killCountNow < 7) {
           score -= 500; // Erken aşamada kılığını öldürmek intihardır, yapma!
         } else {
           // Oyun sonuna doğru veya dedektif yaklaştığında, kılığını öldürüp kafa karıştırmak (blöf) mantıklı olabilir.
@@ -455,14 +479,18 @@ export function runStandardAiTurn(game) {
         }
       }
 
-      score += Math.random() * 15;
+      score += Math.random() * 15 * noiseScale;
       return { ...t, score };
     }).sort((a, b) => b.score - a.score);
 
     // Eşik aşıldıysa (3+ tur üst üste sadece kaçtıysa) ve geçerli bir hedef varsa,
     // savunma mantığını atlayıp zorla saldırıya geç. Sonsuza kadar saklanmak
     // garantili kayıp demektir — katil risk almak zorunda.
-    const mustPressAttack = passiveStreak >= 3 && targets.length > 0;
+    // Maç sayısı: katil kazanmaya son bir hamle kalacak kadar yakınsa (win eşiğine
+    // sadece 1 cinayet kaldıysa — dedektifin "isMatchPoint" eşiğiyle simetrik), kaçış/kılık
+    // değiştirme önceliklerini bastırıp doğrudan saldırıya geçmeliyiz.
+    const killerMatchPoint = killCountNow >= STANDARD_KILLER_WIN_DEATH_COUNT - 1 && targets.length > 0;
+    const mustPressAttack = (passiveStreak >= 3 || killerMatchPoint) && targets.length > 0;
 
     // Kılık değiştirme değerlendirmesi (Artık daha agresif bir saldırı aracı)
     let disguiseScore = 0;
@@ -486,10 +514,20 @@ export function runStandardAiTurn(game) {
         disguiseScore += (5 - targets.length) * 10;
       }
     }
-    disguiseScore += Math.random() * 20;
+    disguiseScore += Math.random() * 20 * noiseScale;
+
+    // disguiseAlsoExposed yukarıda tanımlandı: yedek kılık da zaten daralmışsa kılık
+    // değiştirmek güvenli bir yere değil, dedektifin tahmin edebileceği bilinen bir
+    // kimliğe taşır.
+    if (disguiseAlsoExposed) {
+      disguiseScore -= 200;
+    }
+
     const shouldDisguise = !isDisguiseDead && disguiseScore >= 60;
 
     // Kaydırma değerlendirmesi: dedektiften uzaklaş / örüntüyü dağıt
+    const isHard = game.difficulty === 'hard';
+    const canKillInspectorNow = targets.some(t => inspectorCandidates.has(t.suspectId));
     const shifts = allShiftMoves(game);
     let bestKillerShift = null;
     let bestKillerShiftScore = -Infinity;
@@ -525,7 +563,15 @@ export function runStandardAiTurn(game) {
       ).length;
       const clusterGain = clusterScore - newCluster;
 
-      let shiftScore = distGain * 20 + clusterGain * 12 + (Math.random() - 0.5) * 10;
+      let shiftScore = distGain * 20 + clusterGain * 12 + (Math.random() - 0.5) * 10 * noiseScale;
+
+      // Avlanma bonusu: dedektifin "hunting" mantığının (havuz daraldıkça katile yaklaşması)
+      // katil tarafındaki simetriği. Dedektif aday havuzu darsa ve şu an bitişik/öldürebileceğimiz
+      // bir hedef yoksa, dedektife yaklaşmak (mesafeyi azaltmak) gelecek turda öldürme fırsatı yaratır.
+      const tightInspectorPool = inspectorCandidates.size > 0 && inspectorCandidates.size <= 4;
+      if (tightInspectorPool && !canKillInspectorNow) {
+        shiftScore += -distGain * (isHard ? 30 : 15);
+      }
 
       // Masum işaretli (henüz öldürülmemiş) bir karakteri, öldürüldüğünde dedektif
       // aday havuzunu iyi bölecek bir konuma getirmek için pozisyon avantajı ara.
@@ -542,14 +588,67 @@ export function runStandardAiTurn(game) {
         }
       }
       shiftScore += huntExoneratedBonus;
+
+      // Kenar pozisyonu tuzağı: kimliğimiz daraldıysa (dedektif muhtemelen bizi biliyor),
+      // board'un en dış satır/sütununda kalmak tehlikelidir. Dedektif ters yönden bir
+      // kaydırma ile bizi, kalabalık ve çok sayıda canlı karakterin bulunduğu bir alana
+      // üzerimize gelmeden çekebilir ve böylece bizi "kör atış" yapmaya zorlayabilir. Kimlik
+      // daralmışken merkeze doğru kayan hamleleri, kenara kayanları cezalandırarak ödülendirelim.
+      if (identityNarrow) {
+        const numRows = tempBoard.length;
+        const numCols = tempBoard[0]?.length ?? 0;
+        const isEdgePos = (p) => p.r === 0 || p.r === numRows - 1 || p.c === 0 || p.c === numCols - 1;
+        if (killerPos && isEdgePos(killerPos) && !isEdgePos(newKillerPos)) {
+          shiftScore += isHard ? 35 : 20;
+        } else if (killerPos && !isEdgePos(killerPos) && isEdgePos(newKillerPos)) {
+          shiftScore -= isHard ? 35 : 20;
+        }
+      }
       
-      // Kılık değiştirme planımız varsa, yedek kılığı merkeze çekmek harika bir hamledir
-      if (shouldDisguise && !isDisguiseDead && disguisePos) {
+      // Yedek kılığın (pasif kart) konumu SADECE tam kılık değiştireceğimiz an değil, HER
+      // ZAMAN önemlidir: dedektif sadece 2 sabit kartımız olduğunu bilir, birini deşifre
+      // ettiyse diğerinin nerede olduğunu tahmin edip oraya kamp kurabilir ve tam kılık
+      // değiştirdiğimiz an Tutukla ile bizi bekliyor olabilir. Bu yüzden pasif kartı SÜREKLİ
+      // güvenli tutmaya çalışıyoruz — sadece bu tur kılık değiştirecekken değil.
+      if (!isDisguiseDead && disguisePos && (tightPool || shouldDisguise)) {
         const newDisguisePos = positionOf(tempBoard, disguiseSuspectId);
         if (newDisguisePos) {
-          const oldCenterDist = Math.abs(disguisePos.r - 2) + Math.abs(disguisePos.c - 2);
-          const newCenterDist = Math.abs(newDisguisePos.r - 2) + Math.abs(newDisguisePos.c - 2);
-          shiftScore += (oldCenterDist - newCenterDist) * 15;
+          if (shouldDisguise && tightPool && !disguiseAlsoExposed) {
+            // SALDIRI KOMBOSU: bu tur gerçekten kılık değiştirecek ve yedek kılığımız
+            // HÂLÂ GÜVENLİyse (dedektif onu tanımıyor), onu en yakın dedektif adayına
+            // YAKLAŞTIRMAK mantıklıdır: kılık değiştirdiğimizde artık bilinmeyen/güvenli
+            // yeni kimliğimiz doğrudan hedefin yanında olur ve bir sonraki katil
+            // turumuzda saldırı fırsatı hazır bekler.
+            let oldMinDist = Infinity, newMinDist = Infinity;
+            for (const candId of inspectorCandidates) {
+              const oldCandPos = positionOf(game.board, candId);
+              const newCandPos = positionOf(tempBoard, candId);
+              if (oldCandPos) oldMinDist = Math.min(oldMinDist, chebyshev(disguisePos.r, disguisePos.c, oldCandPos.r, oldCandPos.c));
+              if (newCandPos) newMinDist = Math.min(newMinDist, chebyshev(newDisguisePos.r, newDisguisePos.c, newCandPos.r, newCandPos.c));
+            }
+            if (oldMinDist !== Infinity && newMinDist !== Infinity) {
+              shiftScore += (oldMinDist - newMinDist) * (isHard ? 25 : 15);
+            }
+          } else if (tightPool) {
+            // SÜREKLİ KORUMA (kılık değiştirmesek bile): pasif kartı dedektif adayından
+            // UZAKLAŞTIRIYORUZ. Ya yedek kılık zaten deşifre olmuş (disguiseAlsoExposed)
+            // ya da bu tur kılık değiştirmeyi planlamıyoruz ama dedektif yine de o karta
+            // pusu kurabilir — her iki durumda da yakınlık risktir, uzaklık güvenliktir.
+            let oldMinDist = Infinity, newMinDist = Infinity;
+            for (const candId of inspectorCandidates) {
+              const oldCandPos = positionOf(game.board, candId);
+              const newCandPos = positionOf(tempBoard, candId);
+              if (oldCandPos) oldMinDist = Math.min(oldMinDist, chebyshev(disguisePos.r, disguisePos.c, oldCandPos.r, oldCandPos.c));
+              if (newCandPos) newMinDist = Math.min(newMinDist, chebyshev(newDisguisePos.r, newDisguisePos.c, newCandPos.r, newCandPos.c));
+            }
+            if (oldMinDist !== Infinity && newMinDist !== Infinity) {
+              shiftScore += (newMinDist - oldMinDist) * (isHard ? 20 : 10);
+            }
+          } else if (shouldDisguise) {
+            const oldCenterDist = Math.abs(disguisePos.r - 2) + Math.abs(disguisePos.c - 2);
+            const newCenterDist = Math.abs(newDisguisePos.r - 2) + Math.abs(newDisguisePos.c - 2);
+            shiftScore += (oldCenterDist - newCenterDist) * 15;
+          }
         }
       } else if (bluffSuspectId) {
         // Blöf yapıyorsak, tamamen alakasız bir karakteri merkeze çekip dedektifi kandıralım!
@@ -576,10 +675,19 @@ export function runStandardAiTurn(game) {
 
     // KARAR AĞACI
 
-    const canKillInspector = targets.some(t => inspectorCandidates.has(t.suspectId));
-    const isHard = game.difficulty === 'hard';
-    const killGambleChance = isHard ? 1.0 / inspectorCandidates.size : 0.8;
-    const shouldGamble = inspectorCandidates.size <= 2 || Math.random() < killGambleChance;
+    const canKillInspector = canKillInspectorNow;
+    // Bitişik bir dedektif adayına saldırmanın gerçek bir maliyeti yoktur: doğruysa
+    // oyunu kazandırır, yanlışsa normal bir öldürme sayılır (10 hedefine katkı sağlar).
+    // Bu yüzden zor modda elimizde geçerli bir hedef varsa asla tereddüt etmeyelim.
+    //
+    // AMA: saldırmak kendi kimliğimizi DEĞİŞTİRMEZ. Gerçekten çift taraflı deşifre
+    // olduysak (exposedThreat = kimlik VE kılık ikisi de daralmış), saldırı tutsun ya
+    // da tutmasın, aynı (bilinen) kimlikte kalırız ve dedektif bir sonraki turda direkt
+    // Suçla (Accuse) yapıp oyunu anlık kazanabilir. Güvenli bir kılık değiştirme seçeneği
+    // varsa (shouldDisguise), bu gerçek tehlikeyi saldırmadan önce gidermeliyiz — tabii
+    // çaresizlik/maç sayacı (mustPressAttack) devredeyse yine saldırırız.
+    const shouldEscapeInsteadOfGamble = exposedThreat && shouldDisguise && !mustPressAttack;
+    const shouldGamble = isHard ? !shouldEscapeInsteadOfGamble : (inspectorCandidates.size <= 2 || Math.random() < 0.8);
 
     if (canKillInspector && shouldGamble) {
       const bestScore = targets[0].score;
@@ -587,14 +695,26 @@ export function runStandardAiTurn(game) {
       if (t) return applyStandardKill(game, t.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
     }
 
+    // 1.5. Bilgi kazın: elimizde masum işaretli (henüz öldürülmemiş) bir hedef varsa,
+    // onu öldürmek dedektifin GERÇEK konumu hakkında kesin bilgi açığa çıkarır
+    // (applyStandardKill içindeki komşuluk sorgusu). Sadece gerçek fiziksel tehlikedeysek
+    // (inspectorThreat = dedektif adayı hemen yanımızda) bunu atlayıp önce kaçıyoruz;
+    // sadece dedüksiyonla köşeye sıkışmış olmak (exposedThreat) bu fırsatı harcamaya değmez.
+    const infoKillTarget = targets.find(t => publicExonerated.includes(t.suspectId));
+    if (!mustPressAttack && infoKillTarget && !inspectorThreat) {
+      return applyStandardKill(game, infoKillTarget.suspectId, killerIdentityId, game.inspector.secretIdentitySuspectId).game;
+    }
+
     // 2. Tehdit altındaysak veya Deşifre olduysak: önce kaç (kılık değiştir veya kaydır)
     // AMA: çaresizlik eşiğini aştıysak (mustPressAttack) artık kaçmayı bırakıp saldırmalıyız.
     if (!mustPressAttack && (inspectorThreat || exposedThreat)) {
-      if (shouldDisguise && Math.random() < 0.75) {
+      const escapeDisguiseP = isHard ? 1.0 : 0.75;
+      const escapeShiftP    = isHard ? 1.0 : 0.65;
+      if (shouldDisguise && Math.random() < escapeDisguiseP) {
         const { ok, game: next } = applyStandardDisguise(game);
         if (ok) return next;
       }
-      if (shiftWorthIt && Math.random() < 0.65) {
+      if (shiftWorthIt && Math.random() < escapeShiftP) {
         return applyStandardShift(game, bestKillerShift.axis, bestKillerShift.index, bestKillerShift.direction).game;
       }
     }
