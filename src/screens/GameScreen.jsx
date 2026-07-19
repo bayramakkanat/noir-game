@@ -851,7 +851,7 @@ function SolveOverlay({ game, actions, cardSize = 74 }) {
         <div className="font-mono text-[10px] tracking-widest text-orange-400/70 uppercase mb-1">Çözüm</div>
         <h2 className="font-display text-xl text-noir-text mb-1">Katili ve kılığını belirle</h2>
         <p className="text-[11px] text-[#7A7A6A] font-mono mb-5">
-          Yanlış tahmin edersan katil kazanır!
+          Yanlış tahmin edersen katil kazanır!
         </p>
 
         {/* İki sütun: Identity + Disguise */}

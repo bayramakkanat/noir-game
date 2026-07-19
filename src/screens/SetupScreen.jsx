@@ -153,7 +153,7 @@ export default function SetupScreen({ onStart, onBack, gameMode }) {
               Dedektif
             </div>
             <div className="font-body text-xs text-white/40 mt-1 leading-relaxed">
-              İpucu topla, şüphelileri elek. 25 kişi arasından katili bul ve itham et.
+              İpucu topla, şüphelileri ele. 25 kişi arasından katili bul ve itham et.
             </div>
           </div>
         </button>
