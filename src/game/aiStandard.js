@@ -129,10 +129,7 @@ function evaluateInspectorPos(game, board, killSites) {
     .filter(n => !publicExonerated.includes(n.cell.suspectId)).length;
 
   // Avlanma (Hunting) Skoru: Katilin kimliğini daralttıysak, onlara olan mesafe.
-  // ESKİDEN sadece havuz <=6'ya inince aktifti (25 kişilik kadroda bu neredeyse
-  // hiç tetiklenmiyordu, dedektif oyunun büyük kısmında amaçsız kalıyordu).
-  // Eşiği genişlettik: artık orta büyüklükteki havuzlarda da (≤14) hafif bir
-  // yaklaşma isteği oluşuyor, sadece son derece daralmış (≤6) havuzda tam güvençle.
+  // Havuz ≤14 olduğunda tam güvençle aktif — önceden bu sadece havuz ≤≤
   let distToConfirmedKiller = Infinity;
   let candidateExposure = 0;
 
@@ -141,10 +138,8 @@ function evaluateInspectorPos(game, board, killSites) {
       const posCand = positionOf(board, candId);
       if (posCand) {
         const d = chebyshev(pos.r, pos.c, posCand.r, posCand.c);
-        if (game.killerCandidates.length <= 10) {
-          if (d < distToConfirmedKiller) {
-            distToConfirmedKiller = d;
-          }
+        if (d < distToConfirmedKiller) {
+          distToConfirmedKiller = d;
         }
 
         // Katili canlıların bol olduğu ve tuzaklı (masum) bölgelere çekme isteği —
@@ -272,7 +267,11 @@ function guessDisguise(game, guessIdentityId, killSites, cfg, disguiseCandidates
     ...game.board.flat().filter(Boolean).map(c => c.suspectId),
     ...(game.killedSuspectIds ?? []),
   ];
-  let candidates = [...new Set(allIds)].filter(id => id !== guessIdentityId && !knownInnocents.has(id));
+  let candidates = [...new Set(allIds)].filter(id =>
+    id !== guessIdentityId &&
+    id !== game.inspector.secretIdentitySuspectId && // Dedektif kendi kimliğinin katilin kılığı olamayacağını bilir
+    !knownInnocents.has(id)
+  );
 
   if (disguiseCandidates?.size > 0) {
     const narrowed = candidates.filter(id => disguiseCandidates.has(id));
