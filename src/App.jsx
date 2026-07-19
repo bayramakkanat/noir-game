@@ -220,8 +220,8 @@ export default function App() {
   const multiInGame = mode === 'multi' && !!multi.game && !multi.game.gameOver && multi.status === 'playing';
   const inGame = soloInGame || multiInGame;
   
-  // Müzik her zaman çalsın (eğer sessize alınmadıysa). Oyun içindeyken ses %50 kısılsın.
-  useBgMusic(!isMuted, inGame ? 0.5 : 1.0);
+  // Müzik her zaman çalsın (eğer sessize alınmadıysa). Oyun içindeyken ses %65 kısılsın (yani %35 seviyesinde çalsın).
+  useBgMusic(!isMuted, inGame ? 0.35 : 1.0);
 
   if (mode === 'menu') {
     return <div className="grain"><MainMenu onSelect={setMode} isMuted={isMuted} onToggleMute={() => setIsMuted(!isMuted)} globalGameMode={globalGameMode} setGlobalGameMode={setGlobalGameMode} /></div>;
