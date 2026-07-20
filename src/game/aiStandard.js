@@ -129,7 +129,7 @@ function evaluateInspectorPos(game, board, killSites) {
     .filter(n => !publicExonerated.includes(n.cell.suspectId)).length;
 
   // Avlanma (Hunting) Skoru: Katilin kimliğini daralttıysak, onlara olan mesafe.
-  // Havuz <=14 olduğunda tam güvençle aktif (önceden bu sadece havuz <=10 iken çalışıyordu,
+  // Havuz <=14 olduğunda tam güvenle aktif (önceden bu sadece havuz <=10 iken çalışıyordu,
   // yani dış ve iç eşik tutarsızdı ve avlanma çoğu oyunda hiç tetiklenmiyordu).
   let distToConfirmedKiller = Infinity;
   let candidateExposure = 0;
